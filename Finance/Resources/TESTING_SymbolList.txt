@@ -1,0 +1,9 @@
+﻿ALL	Allstate Corp
+AZO	Autozone
+BEST	Best Inc
+BOX	Box Inc
+BP	BP Plc
+CARS	Cars.com Inc
+CAT	Caterpillar Inc
+DDS	Dillard's
+DIS	Walt Disney Company

@@ -1,0 +1,21 @@
+﻿List of rules that need to be implemented:
+
+Time-of-Trade Rules:
+
+	1) Initial Minimum Equity Requirement
+		-You are required to have a minimum of $2,000 or USD equivalent of securities equity with loan value or commodities net liquidation value to open a new position.
+	2) Initial Margin
+		-If available funds, after the order request, would be greater than or equal to zero, the order is accepted; if available funds would be negative, the order is rejected.
+	3) Position Leverage
+		-Gross Position Value must not be more than 30 times the Net Liquidation Value minus the futures options value at time of trade.
+
+Real-Time Position Rules
+
+	1) Maintenance Margin
+		-If Excess liquidity < 0 at any time during the day, positions are liquidated in real time.
+	2) Gross Position Leverage
+		- Gross Position Value is not more than 50 times the Net Liquidation Value minus the futures options value. 
+
+SMA and EOD 
+
+	1) SMA at the end of each trading day must be >= 0 or account faces liquidation

@@ -1,10 +1,11 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\packages\EntityFramework.6.3.0\build\EntityFramework.props" Condition="Exists('..\packages\EntityFramework.6.3.0\build\EntityFramework.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>b5ffff89-08a5-4188-a857-173dedd04b22</ProjectGuid>
+    <ProjectGuid>{B5FFFF89-08A5-4188-A857-173DEDD04B22}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Finance</RootNamespace>
@@ -12,6 +13,8 @@
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -31,24 +34,127 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="System"/>
-    
-    <Reference Include="System.Core"/>
-    <Reference Include="System.Xml.Linq"/>
-    <Reference Include="System.Data.DataSetExtensions"/>
-    
-    
-    <Reference Include="Microsoft.CSharp"/>
-    
-    <Reference Include="System.Data"/>
-    
-    <Reference Include="System.Net.Http"/>
-    
-    <Reference Include="System.Xml"/>
+    <Reference Include="CSharpAPI">
+      <HintPath>..\..\..\..\..\..\TWS API\samples\CSharp\IBSampleApp\bin\Release\CSharpAPI.dll</HintPath>
+    </Reference>
+    <Reference Include="EntityFramework, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089, processorArchitecture=MSIL">
+      <HintPath>..\packages\EntityFramework.6.3.0\lib\net45\EntityFramework.dll</HintPath>
+    </Reference>
+    <Reference Include="EntityFramework.SqlServer, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089, processorArchitecture=MSIL">
+      <HintPath>..\packages\EntityFramework.6.3.0\lib\net45\EntityFramework.SqlServer.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.ComponentModel.DataAnnotations" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Windows.Forms.DataVisualization" />
+    <Reference Include="System.Windows.Forms.DataVisualization.Design" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Class1.cs" />
+    <Compile Include="Database\Database.cs" />
+    <Compile Include="Database\DataManager.cs" />
+    <Compile Include="DataProviders\IbkrDataProvider.cs" />
+    <Compile Include="DataProviders\DataProvider.cs" />
+    <Compile Include="Helpers\Calendar.cs" />
+    <Compile Include="Helpers\CustomAttributes.cs" />
+    <Compile Include="Helpers\CustomControls.cs" />
+    <Compile Include="Helpers\CustomEvents.cs" />
+    <Compile Include="Helpers\CustomExceptions.cs" />
+    <Compile Include="Helpers\Enums.cs" />
+    <Compile Include="Environment\IbkrEnvironment.cs" />
+    <Compile Include="Environment\IEnvironment.cs" />
+    <Compile Include="Helpers\Helpers.cs" />
+    <Compile Include="Helpers\Logger.cs" />
+    <Compile Include="NewScheme\Implementations\TradeStrategies.cs" />
+    <Compile Include="NewScheme\MasterController.cs" />
+    <Compile Include="NewScheme\Position.cs" />
+    <Compile Include="NewScheme\PriceBar.cs" />
+    <Compile Include="NewScheme\Security.cs" />
+    <Compile Include="NewScheme\Signal.cs" />
+    <Compile Include="NewScheme\Simulation.cs" />
+    <Compile Include="NewScheme\SimulationManager.cs" />
+    <Compile Include="NewScheme\SimulationResults.cs" />
+    <Compile Include="NewScheme\StrategyManager.cs" />
+    <Compile Include="NewScheme\TradeApprovalRules.cs" />
+    <Compile Include="NewScheme\Trade.cs" />
+    <Compile Include="NewScheme\TradeManager.cs" />
+    <Compile Include="NewScheme\Portfolio.cs" />
+    <Compile Include="NewScheme\PortfolioManager.cs" />
+    <Compile Include="NewScheme\RiskManager.cs" />
+    <Compile Include="NewScheme\TradeStrategyBase.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="NewScheme\PortfolioSetup.cs" />
+    <Compile Include="UI\Components\PortfolioSimulationResultChart.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="UI\Components\SingleSecuritySimResultChart.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="UI\LogOutputUI.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\LogOutputUI.Designer.cs">
+      <DependentUpon>LogOutputUI.cs</DependentUpon>
+    </Compile>
+    <Compile Include="UI\SecurityManagerUI.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\SecurityManagerUI.Designer.cs">
+      <DependentUpon>SecurityManagerUI.cs</DependentUpon>
+    </Compile>
+    <Compile Include="UI\SimulationManagerUI.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\SimulationManagerUI.Designer.cs">
+      <DependentUpon>SimulationManagerUI.cs</DependentUpon>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Resources\NASDAQ_SymbolList.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\NYSE_SymbolList.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\TESTING_SymbolList.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="_Deprecated\_Rules\RulesDescriptions.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="_Deprecated\_Manager\" />
+    <Folder Include="_Deprecated\_Models\" />
+    <Folder Include="_Deprecated\_Strategy\" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="UI\LogOutputUI.resx">
+      <DependentUpon>LogOutputUI.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\SecurityManagerUI.resx">
+      <DependentUpon>SecurityManagerUI.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\SimulationManagerUI.resx">
+      <DependentUpon>SimulationManagerUI.cs</DependentUpon>
+    </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
- </Project>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\EntityFramework.6.3.0\build\EntityFramework.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\EntityFramework.6.3.0\build\EntityFramework.props'))" />
+    <Error Condition="!Exists('..\packages\EntityFramework.6.3.0\build\EntityFramework.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\EntityFramework.6.3.0\build\EntityFramework.targets'))" />
+  </Target>
+  <Import Project="..\packages\EntityFramework.6.3.0\build\EntityFramework.targets" Condition="Exists('..\packages\EntityFramework.6.3.0\build\EntityFramework.targets')" />
+</Project>
