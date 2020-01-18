@@ -11,10 +11,6 @@ namespace Finance
 {
     public class SimulationManager
     {
-
-        public BindingList<Simulation> Simulations { get; private set; } = new BindingList<Simulation>();
-        public int SimulationCount { get => Simulations.Count; }
-
         #region Events
 
         public delegate void SimulationStatusEventHandler(object sender, SimulationStatusEventArgs e);
@@ -86,6 +82,9 @@ namespace Finance
         ProcessStatus lastStatus { get; set; }
 
         #endregion
+
+        public BindingList<Simulation> Simulations { get; private set; } = new BindingList<Simulation>();
+        public int SimulationCount { get => Simulations.Count; }
 
         public SimulationManager()
         {
@@ -163,6 +162,5 @@ namespace Finance
                 Run(simulation, startDate, endDate);
             }
         }
-
     }
 }

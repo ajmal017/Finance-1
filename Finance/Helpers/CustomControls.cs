@@ -4,19 +4,354 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Windows.Forms.DataVisualization.Charting;
+using Timer = System.Windows.Forms.Timer;
 
 namespace Finance
 {
-    #region ControlManager
+    #region System Clock
 
     //
-    // Defines a generic class to implement a control issuer
+    // Simple UI Components enabling display of a clock panel with user-selected Time Zones
     //
+
+    public class SystemClock : Form
+    {
+        Size _formSize = new Size(0, 0); // This gets adjusted as controls are added
+        Timer tmrClockTimer;
+        List<TimeZoneInfo> timeZones;
+        Panel innerPanel;
+        MenuStrip menuStrip;
+        ToolStripMenuItem menuAddZone;
+
+        public SystemClock()
+        {
+            this.InitializeMe();
+            tmrClockTimer?.Start();
+        }
+
+        [Initializer]
+        private void SetMenuStrip()
+        {
+            menuStrip = new MenuStrip();
+            menuAddZone = new ToolStripMenuItem();
+
+            menuStrip.Name = "menu";
+            menuAddZone.Text = "Add";
+            menuAddZone.Click += (s, e) =>
+            {
+                (new TimeZoneSelector(this)).Show();
+            };
+
+            menuStrip.Items.Add(menuAddZone);
+            Controls.Add(menuStrip);
+        }
+        [Initializer]
+        private void SetStyle()
+        {
+            //
+            // Form
+            //
+            Size = _formSize;
+            FormBorderStyle = FormBorderStyle.FixedSingle;
+
+            //
+            // Inner Panel
+            //
+            innerPanel = new Panel();
+            Controls.Add(innerPanel);
+            innerPanel.DockTo(menuStrip, DockSide.Bottom, 0);
+        }
+        [Initializer]
+        private void SetDefaultTimeZone()
+        {
+            timeZones = new List<TimeZoneInfo>();
+            AddTimeZone(TimeZoneInfo.Local);
+        }
+        [Initializer]
+        private void SetTimerActions()
+        {
+            tmrClockTimer = new Timer();
+            tmrClockTimer.Interval = 1000 - DateTime.Now.Millisecond;
+            tmrClockTimer.Tick += (s, e) => { SetTimes(); };
+        }
+
+        private void SetDisplay()
+        {
+            SuspendLayout();
+            innerPanel.Controls.Clear();
+            foreach (TimeZoneInfo zone in timeZones)
+            {
+                var ctrl = new TimePanel(zone, (zone.Id == TimeZoneInfo.Local.Id ? true : false));
+                ctrl.Delete += (s, e) =>
+                {
+                    if (s is TimePanel t)
+                        RemoveTimeZone(t.timeZone);
+                };
+                innerPanel.Controls.Add(ctrl);
+
+                for (int i = 1; i < innerPanel.Controls.Count; i++)
+                    innerPanel.Controls[i].DockTo(innerPanel.Controls[i - 1], DockSide.Bottom, 0);
+
+                innerPanel.Height = innerPanel.Controls.Count * TimePanel._panelSize.Height;
+                innerPanel.Width = TimePanel._panelSize.Width;
+            }
+
+            Height = innerPanel.Height + menuStrip.Height + (Height - ClientRectangle.Height);
+            Width = innerPanel.Width + (Width - ClientRectangle.Width);
+
+            ResumeLayout();
+        }
+        private void SetTimes()
+        {
+            tmrClockTimer.Interval = 1000;
+            if (Visible)
+                Invoke(new Action(() =>
+                {
+                    foreach (Control ctrl in innerPanel.Controls)
+                    {
+                        if (ctrl is TimePanel t)
+                            t.UpdateDisplay(DateTime.Now);
+                    }
+                }));
+        }
+        public void AddTimeZone(TimeZoneInfo timeZone)
+        {
+            timeZones.Add(timeZone);
+            timeZones.Sort((x, y) => x.BaseUtcOffset.CompareTo(y.BaseUtcOffset));
+            SetDisplay();
+        }
+        public void AddTimeZone(string timeZoneId)
+        {
+            var tz = TimeZoneInfo.GetSystemTimeZones().First(x => x.Id == timeZoneId);
+            AddTimeZone(tz);
+        }
+        public void RemoveTimeZone(TimeZoneInfo timeZone)
+        {
+            timeZones.Remove(timeZone);
+            SetDisplay();
+        }
+        public void RemoveTimeZone(string timeZoneId)
+        {
+            var tz = TimeZoneInfo.GetSystemTimeZones().First(x => x.Id == timeZoneId);
+            RemoveTimeZone(tz);
+        }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+            base.OnPaint(e);
+        }
+
+    }
+    public class TimePanel : Panel
+    {
+        public event EventHandler Delete;
+        private void OnDelete() => Delete?.Invoke(this, null);
+
+        public TimeZoneInfo timeZone { get; }
+        public bool IsLocal { get; }
+        Label lblZone;
+        Label lblDate;
+        Label lblClock;
+        Label lblSeconds;
+        Label lblDelete;
+
+        public readonly static Size _panelSize = new Size(350, 125);
+
+        public TimePanel(TimeZoneInfo timeZone, bool isLocal = false)
+        {
+            this.timeZone = timeZone ?? throw new ArgumentNullException(nameof(timeZone));
+            IsLocal = isLocal;
+            this.InitializeMe();
+
+            UpdateDisplay(DateTime.Now);
+        }
+
+        [Initializer]
+        private void SetStyle()
+        {
+            lblZone = new Label();
+            lblDate = new Label();
+            lblClock = new Label();
+            lblSeconds = new Label();
+
+            //
+            // this Panel
+            //
+            BackColor = Color.Black;
+            Size = _panelSize;
+
+            //
+            // lblZone
+            //
+            lblZone.Font = Helpers.SystemFont(12, FontStyle.Bold);
+            lblZone.BackColor = IsLocal ? Color.DarkGreen : Color.DarkGoldenrod;
+            lblZone.ForeColor = IsLocal ? Color.LightGray : Color.Black;
+            lblZone.TextAlign = ContentAlignment.MiddleCenter;
+            lblZone.Size = new Size(_panelSize.Width, 25);
+            TimeSpan offset = timeZone.GetUtcOffset(DateTime.Now);
+            lblZone.Text = $"{timeZone.StandardName} (UTC{(offset < TimeSpan.Zero ? "-" : "+")}{offset:hh\\:mm})";
+
+            //
+            // lblDate
+            //
+            lblDate.Font = Helpers.SystemFont(10);
+            lblDate.ForeColor = Color.White;
+            lblDate.TextAlign = ContentAlignment.MiddleCenter;
+            lblDate.Size = new Size(_panelSize.Width, 15);
+
+            //
+            // lblClock
+            //
+            lblClock.Font = Helpers.SystemFont(48);
+            lblClock.ForeColor = IsLocal ? Color.Green : Color.DarkGoldenrod;
+            lblClock.TextAlign = ContentAlignment.MiddleCenter;
+            lblClock.Size = new Size(_panelSize.Width, 60);
+
+            //
+            // lblSeconds
+            //
+            lblSeconds.Font = Helpers.SystemFont(12);
+            lblSeconds.ForeColor = IsLocal ? Color.Green : Color.DarkGoldenrod;
+            lblSeconds.TextAlign = ContentAlignment.MiddleCenter;
+            lblSeconds.Size = new Size(50, 20);
+
+            //
+            // Add and Arrange
+            //
+            Controls.Add(lblZone);
+            Controls.Add(lblDate);
+            Controls.Add(lblClock);
+            Controls.Add(lblSeconds);
+
+            lblZone.Location = new Point(0, 0);
+            lblDate.DockTo(lblZone, DockSide.Bottom, 0);
+            lblClock.DockTo(lblDate, DockSide.Bottom, 0);
+            lblSeconds.Location = new Point(260, 83);
+            lblSeconds.BringToFront();
+        }
+        [Initializer]
+        private void SetDelete()
+        {
+            if (IsLocal) return;
+
+            lblDelete = new Label();
+            lblDelete.Size = new Size(15, 15);
+            lblDelete.Text = "X";
+            lblDelete.Font = Helpers.SystemFont(8);
+            lblDelete.BackColor = lblZone.BackColor;
+            lblDelete.ForeColor = Color.Black;
+
+            lblDelete.Click += (s, e) => OnDelete();
+
+            Controls.Add(lblDelete);
+            lblDelete.Location = new Point(this.Width - 15, 0);
+            lblDelete.BringToFront();
+        }
+
+        public void UpdateDisplay(DateTime time)
+        {
+            lblDate.Text = TimeZoneInfo.ConvertTime(time, timeZone).ToString("dddd, dd MMMM yyyy (MM/dd/yy)");
+            lblClock.Text = TimeZoneInfo.ConvertTime(time, timeZone).ToString(@"HH\:mm");
+            lblSeconds.Text = DateTime.Now.ToString(@".ss");
+
+            Refresh();
+        }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+            base.OnPaint(e);
+        }
+    }
+    public class TimeZoneSelector : Form
+    {
+        Size _formSize = new Size(300, 375);
+        Size _selectorSize = new Size(275, 275);
+        Size _buttonSize = new Size(125, 40);
+
+        ListBox listSelector;
+        Button btnAccept;
+        Button btnClose;
+
+        SystemClock clock;
+
+        public TimeZoneSelector(SystemClock clock)
+        {
+            this.clock = clock;
+            this.InitializeMe();
+            Show();
+        }
+        [Initializer]
+        private void SetStyle()
+        {
+            Size = _formSize;
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+        }
+        [Initializer]
+        private void SetControls()
+        {
+            listSelector = new ListBox();
+            btnAccept = new Button();
+            btnClose = new Button();
+
+            //
+            // Selector
+            //
+            listSelector.Size = _selectorSize;
+            listSelector.DataSource = (TimeZoneInfo.GetSystemTimeZones());
+            listSelector.DisplayMember = "StandardName";
+            listSelector.ValueMember = "Id";
+
+            //
+            // Accept
+            //
+            btnAccept.Size = _buttonSize;
+            btnAccept.Text = "Add";
+            btnAccept.Click += (s, e) =>
+            {
+                if (listSelector.SelectedIndex != -1)
+                    this.clock?.AddTimeZone(listSelector.SelectedValue as string);
+            };
+
+            //
+            // Closer
+            //
+            btnClose.Size = _buttonSize;
+            btnClose.Text = "Close";
+            btnClose.Click += (s, e) =>
+            {
+                Close();
+            };
+
+            //
+            // Add and arrange
+            //
+            listSelector.Location = new Point(5, 10);
+
+            Controls.Add(listSelector);
+            Controls.Add(btnAccept);
+            Controls.Add(btnClose);
+
+            btnAccept.DockTo(listSelector, DockSide.Bottom, 5);
+            btnClose.DockTo(btnAccept, DockSide.Right, 25);
+
+        }
+
+    }
+
+    #endregion
+    #region ControlManager
+
+    /*
+     *  ControlManagers allow a non-UI class to issue UI components and maintain the ability to push updates
+     *  rather than making the subscribing class implement some sort of check or callback.
+     *  
+     *  Abstract class provides basic functionality to issue and maintain a Control, implementations will
+     *  specify the type of Control (Label, Panel, Custom, etc) to issue.
+     */
 
     public abstract class ControlManager
     {
@@ -40,8 +375,7 @@ namespace Finance
     #region Status Indicator Manager and Controls
 
     //
-    // Control Manager instantiated within a class will issue out custom controls
-    // which cn be updated locally to display the object's status on external forms
+    // ControlManager implementation which issues a Label control to display current status of a process
     //
 
     public class StatusLabelControlManager : ControlManager
@@ -60,11 +394,14 @@ namespace Finance
             return ret;
         }
 
-        public void SetStatus(string text, Color color)
+        public void SetStatus(string text, Color color, bool displayName = true)
         {
             foreach (StatusIndicatorLabel ctrl in issuedControls)
             {
-                ctrl.SetStatus(text, color);
+                if (ctrl.InvokeRequired)
+                    ctrl.Invoke(new Action(() => ctrl.SetStatus(text, color, displayName)));
+                else
+                    ctrl.SetStatus(text, color, displayName);
             }
 
             LastStatus = new Tuple<string, Color>(text, color);
@@ -82,18 +419,18 @@ namespace Finance
             BorderStyle = BorderStyle.FixedSingle;
             BackColor = Color.LightBlue;
         }
-        public void SetStatus(string text, Color color)
+        public void SetStatus(string text, Color color, bool displayName)
         {
             if (InvokeRequired)
             {
                 Invoke(new Action(() =>
                 {
-                    SetStatus(text, color);
+                    SetStatus(text, color, displayName);
                 }));
                 return;
             }
 
-            Text = $"{DisplayName}: {text}";
+            Text = displayName ? $"{DisplayName}: {text}" : $"{text}";
             BackColor = color;
             Refresh();
         }
@@ -102,10 +439,10 @@ namespace Finance
     #endregion
     #region Parameter Display Panel
 
-    //
-    // A Panel control which displays values from an object marked with ParameterAttribute
-    // Provides interactive control for runtime-adjustment of parameter values
-    //
+    /*
+     *  A Panel control which displays values from an object marked with ParameterAttribute
+     *  Provides interactive control for runtime-adjustment of parameter values    
+     */
 
     public class ParameterDisplayUpdatePanel : Panel
     {
@@ -258,10 +595,10 @@ namespace Finance
     #endregion
     #region Strategy Display and Selection
 
-    //
-    // Provides a Panel which displays information on a Strategy as stored in the StrategyManager
-    // list of available strategies.  Provides selection capabilities to select active strategy.
-    //
+    /*
+     * Provides a Panel which displays information on a Strategy as stored in the StrategyManager
+     * list of available strategies.  Provides selection capabilities to select active strategy.
+     */
 
     public class StrategyDisplayUpdatePanel : Panel
     {
@@ -572,6 +909,11 @@ namespace Finance
     #endregion
     #region Finance Chart (Base Class)
 
+    /*
+     *  Custom Chart object which implements features which should be common to all chart 
+     *  controls used in the library.
+     */
+
     public abstract class FinanceChart : Chart
     {
         protected ChartArea chartArea;
@@ -839,6 +1181,10 @@ namespace Finance
     #endregion
     #region Single Security Chart
 
+    /*
+     *  Implementation of FinanceChart which displays a single Security as a candlestick chart (using SecuritSeries)
+     */
+
     public class SingleSecurityChart : FinanceChart
     {
         SecuritySeries securitySeries;
@@ -912,6 +1258,7 @@ namespace Finance
 
             Ready = true;
         }
+
         private void SetXAxis(DateTime min, DateTime max)
         {
             chartArea.AxisX.Minimum = min.ToOADate();
@@ -959,7 +1306,6 @@ namespace Finance
             double IntervalSpan = (chartArea.AxisY.Maximum - chartArea.AxisY.Minimum);
             chartArea.AxisY.Interval = Math.Floor(IntervalSpan / 5);
         }
-
         private void SetSeriesZoomLevel()
         {
             if (currentView.Span().TotalDays < 360)
@@ -1061,8 +1407,7 @@ namespace Finance
             Redraw();
         }
 
-
-        #region Chart Effects
+        #region Chart Visual Effects
 
         //
         // Striplines highlighting the day under the cursor
@@ -1322,96 +1667,14 @@ namespace Finance
 
     #endregion
     #region Multi Security Chart
+    
+    /*
+     *  This will display multiple Security series
+     */
 
     public partial class MultiSecurityChart : Chart
     {
-        ChartArea chartArea;
-        SecuritySeries securitySeries;
-        List<Security> securities;
-
-        static decimal _bufferYAxis = 0.10m;
-
-        public MultiSecurityChart(List<Security> securities) : base()
-        {
-            this.securities = securities;
-            chartArea = new ChartArea();
-
-            this.InitializeMe();
-
-            ChartAreas.Clear();
-            ChartAreas.Add(chartArea);
-
-            if (this.securities.Count > 0)
-                Load();
-        }
-
-        [Initializer]
-        private void SetStyles()
-        {
-            chartArea.BackColor = Color.FromArgb(255, 0, 0, 8);
-
-            // Axis X Style
-            chartArea.AxisX.IntervalType = DateTimeIntervalType.Days;
-            chartArea.AxisX.IsStartedFromZero = false;
-            chartArea.AxisX.Interval = 7;
-            chartArea.AxisX.Title = "Date";
-
-            // Axis Y Style
-            chartArea.AxisY.IntervalType = DateTimeIntervalType.Number;
-            chartArea.AxisY.IsStartedFromZero = false;
-            chartArea.AxisY.LabelStyle.Format = "$0.00";
-            chartArea.AxisY.Title = "Share Price";
-
-        }
-
-        private void SetXAxis(DateTime min, DateTime max)
-        {
-            chartArea.AxisX.Minimum = min.ToOADate();
-            chartArea.AxisX.Maximum = max.ToOADate();
-        }
-        private void SetYAxis(decimal min, decimal max)
-        {
-            chartArea.AxisY.Minimum = (min * (1 - _bufferYAxis)).ToDouble();
-            chartArea.AxisY.Maximum = (max * (1 + _bufferYAxis)).ToDouble();
-
-            // Display interval lines rounded to nearest whole value depending on share price
-            double IntervalSpan = (chartArea.AxisY.Maximum - chartArea.AxisY.Minimum);
-            chartArea.AxisY.Interval = Math.Floor(IntervalSpan / 5);
-            chartArea.AxisY.MajorGrid.LineColor = Color.DarkGoldenrod;
-        }
-
-        public void Load()
-        {
-            if (securities.Count == 0)
-                return;
-
-            //securitySeries = this.security.ToChartSeries();
-
-            if (securitySeries.Points.Count > 0)
-                Redraw();
-        }
-        private void Redraw()
-        {
-            if (InvokeRequired)
-            {
-                Invoke(new Action(() => Redraw()));
-                return;
-            }
-
-            // Load Series into Chart Area
-            Series.Clear();
-            securitySeries.ChartArea = "default";
-            Series.Add(securitySeries);
-
-            // Set X
-            SetXAxis(securitySeries.MinX, securitySeries.MaxX);
-
-            // Set Y
-            //SetYAxis(securitySeries.MinY, securitySeries.MaxY);
-
-            // Refresh View
-            Update();
-        }
+       
     }
 
     #endregion

@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 
 namespace Finance
 {
-
     #region Formatting and Display Related Attributes
 
     //
@@ -70,7 +69,6 @@ namespace Finance
     }
 
     #endregion
-
     #region Parameter Related Attributes
 
     //
@@ -152,7 +150,6 @@ namespace Finance
     }
 
     #endregion
-
     #region Helper Attributes
 
     /// <summary>
@@ -165,6 +162,5 @@ namespace Finance
     }
 
     #endregion
-
 }
 

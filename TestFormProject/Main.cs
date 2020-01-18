@@ -2,17 +2,24 @@
 using Finance.UI;
 using System.Drawing;
 using System.Windows.Forms;
+using System;
+using System.Linq;
+using System.Threading;
 using static Finance.Logger;
 
 namespace TestFormProject
 {
     public partial class Main : Form
     {
+
+        Size _formSize = new Size(400, 100);
+
         #region Interface Screens
 
         SecurityManagerUI secManagerUI;
         SimulationManagerUI simManagerUI;
         LogOutputUI logOutputUI;
+        SystemClock systemClockUI;
 
         #endregion
 
@@ -37,6 +44,7 @@ namespace TestFormProject
             // Main form properties
             Text = "Main";
             FormBorderStyle = FormBorderStyle.FixedSingle;
+            Size = _formSize;
 
             // Initialize components
             this.InitializeMe();
@@ -80,15 +88,25 @@ namespace TestFormProject
                 }
 
                 menuConnect.Enabled = false;
-                MasterController.ConnectDataProvider();
+                new Thread(() => MasterController.ConnectDataProvider()).Start();
             };
             MasterController.DataManagerStatusChange += (s, e) =>
             {
-                if (!e.DataproviderConnected)
-                    menuConnect.Enabled = true;
-                else
-                    menuConnect.Enabled = false;
+                try
+                {
+                    if (!e.DataproviderConnected)
+                        Invoke(new Action(() => menuConnect.Enabled = true));
+                    else
+                        Invoke(new Action(() => menuConnect.Enabled = false));
 
+                    Console.WriteLine("test");
+
+                }
+                catch (Exception ex)
+                {
+
+                    throw ex;
+                }
                 Log(new LogMessage(Name, $"Connection Status Changed to {(e.DataproviderConnected ? "CONNECTED" : "DISCONNECTED")}", LogMessageType.Production));
             };
             menuData.DropDownItems.Add(menuConnect);
@@ -117,9 +135,9 @@ namespace TestFormProject
             MasterController.DataManagerStatusChange += (s, e) =>
             {
                 if (!e.DataproviderConnected)
-                    menuReconnect.Enabled = false;
+                    Invoke(new Action(() => { menuReconnect.Enabled = false; }));
                 else
-                    menuReconnect.Enabled = true;
+                    Invoke(new Action(() => { menuReconnect.Enabled = true; }));
 
                 Log(new LogMessage(Name, $"Connection Status Changed to {(e.DataproviderConnected ? "CONNECTED" : "DISCONNECTED")}", LogMessageType.Production));
             };
@@ -151,9 +169,9 @@ namespace TestFormProject
             MasterController.DataManagerStatusChange += (s, e) =>
             {
                 if (e.DatabaseConnected && e.DataproviderConnected)
-                    menuShowDataManager.Enabled = true;
+                    Invoke(new Action(() => menuShowDataManager.Enabled = true));
                 else
-                    menuShowDataManager.Enabled = false;
+                    Invoke(new Action(() => menuShowDataManager.Enabled = false));
 
                 Log(new LogMessage(Name, $"Data Manager Status Changed: Database: {(e.DatabaseConnected ? "YES" : "NO")} " +
                     $"Provider: {(e.DataproviderConnected ? "YES" : "NO")}", LogMessageType.Production));
@@ -172,9 +190,9 @@ namespace TestFormProject
                 //
 
                 if (e.DatabaseConnected && e.DataproviderConnected)
-                    menuShowSimulationManager.Enabled = true;
+                    Invoke(new Action(() => menuShowSimulationManager.Enabled = true));
                 else
-                    menuShowSimulationManager.Enabled = false;
+                    Invoke(new Action(() =>menuShowSimulationManager.Enabled = false));
             };
             menuShowSimulationManager.Click += (s, e) =>
             {
@@ -230,7 +248,7 @@ namespace TestFormProject
             pnlStatusDisplay.Controls.Add(MasterController.DataManager.StatusIndicator);
             pnlStatusDisplay.Controls.Add(MasterController.DataManager.DataProvider.StatusIndicator);
             pnlStatusDisplay.Controls.Add(MasterController.SimulationManager.StatusIndicator);
-            pnlStatusDisplay.Controls.Add(MasterController.DailyUpdateStatusIndicator);
+            pnlStatusDisplay.Controls.Add(MasterController.SystemEventStatusIndicator);
         }
 
         [Initializer]
@@ -238,6 +256,27 @@ namespace TestFormProject
         {
             logOutputUI = new LogOutputUI();
             logOutputUI.Show();
+        }
+
+        [Initializer]
+        private void InitializeSystemClock()
+        {
+            systemClockUI = new SystemClock();
+                        
+            var tz = TimeZoneInfo.GetSystemTimeZones().First(x => x.DisplayName.Contains("Hawaii"));
+            systemClockUI.AddTimeZone(tz);
+
+            tz = TimeZoneInfo.GetSystemTimeZones().First(x => x.DisplayName.Contains("Eastern Time"));
+            systemClockUI.AddTimeZone(tz);
+
+            tz = TimeZoneInfo.GetSystemTimeZones().First(x => x.DisplayName.Contains("Fiji"));
+            systemClockUI.AddTimeZone(tz);
+
+            tz = TimeZoneInfo.GetSystemTimeZones().First(x => x.DisplayName.Contains("Tehran"));
+            systemClockUI.AddTimeZone(tz);
+
+            systemClockUI.Show();
+            systemClockUI.Location = new Point(Screen.PrimaryScreen.WorkingArea.Right - systemClockUI.Width, 0);
         }
 
         #endregion

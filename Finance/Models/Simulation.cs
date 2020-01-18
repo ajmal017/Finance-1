@@ -80,7 +80,7 @@ namespace Finance
                 while (currentDate < endDate)
                 {
                     PortfolioManager.ExecuteNextDay();
-                    currentDate = PortfolioManager.CurrentDate;
+                    currentDate = PortfolioManager.CurrentSimulationDate;
                 }
 
                 Complete = true;

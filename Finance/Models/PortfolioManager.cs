@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Finance
 {
-    public partial class PortfolioManager
+    public class PortfolioManager
     {
         // Created internally
         public Portfolio Portfolio { get; }
@@ -20,8 +20,9 @@ namespace Finance
         public PortfolioSetup Setup { get; }
         public DataManager DataManager { get; }
         public StrategyManager StrategyManager { get; }
-
-        public List<Security> SecurityUniverse { get; set; }
+        
+        public DateTime CurrentSimulationDate { get; private set; }
+        public List<Security> SecurityUniverse { get; }
 
         /// <summary>
         /// Initializes a new portfolio manager able to execute a time simulation
@@ -45,48 +46,45 @@ namespace Finance
 
             SecurityUniverse = (from sec in DataManager.GetAllSecurities() where sec.DataUpToDate select sec).ToList();
 
-            CurrentDate = setup.InceptionDate;
+            CurrentSimulationDate = setup.InceptionDate;
         }
 
         public void SetStartDate(DateTime date)
         {
-            CurrentDate = date;
+            CurrentSimulationDate = date;
             Setup.InceptionDate = date;
             Portfolio.SetInceptionDate(date);
-        }
-
-        public DateTime CurrentDate { get; set; }
-
+        }       
         public void ExecuteNextDay()
         {
             // Increment the date
-            CurrentDate = Calendar.NextTradingDay(CurrentDate);
+            CurrentSimulationDate = Calendar.NextTradingDay(CurrentSimulationDate);
 
             //
             // Market Open
             //
 
             // Process morning trades
-            TradeManager.ProcessTradeQueue(CurrentDate, TimeOfDay.MarketOpen);
+            TradeManager.ProcessTradeQueue(CurrentSimulationDate, TimeOfDay.MarketOpen);
             
             //
             // Market Close
             //
 
             // Process end of day trades & stops
-            TradeManager.ProcessTradeQueue(CurrentDate, TimeOfDay.MarketEndOfDay);
+            TradeManager.ProcessTradeQueue(CurrentSimulationDate, TimeOfDay.MarketEndOfDay);
 
             // Update stoplosses
-            RiskManager.UpdateStoplosses(CurrentDate);
+            RiskManager.UpdateStoplosses(CurrentSimulationDate);
 
             // Scale open positions
-            RiskManager.ScalePositions(CurrentDate);
+            RiskManager.ScalePositions(CurrentSimulationDate);
 
             // Generate new signals
-            var signals = StrategyManager.GenerateSignals(SecurityUniverse, CurrentDate);
+            var signals = StrategyManager.GenerateSignals(SecurityUniverse, CurrentSimulationDate);
 
             // Send signals for processing
-            RiskManager.ProcessSignals(signals, CurrentDate);
+            RiskManager.ProcessSignals(signals, CurrentSimulationDate);
 
             // End of Day (EOD)
         }

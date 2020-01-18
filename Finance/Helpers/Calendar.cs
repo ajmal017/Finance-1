@@ -13,9 +13,6 @@ namespace Finance
     /// </summary>
     public static class Calendar
     {
-        // Dictionary populated with known good trading dates as caalculated to speed up future checks
-        private static ConcurrentDictionary<DateTime, bool> KnownTradingDays = new ConcurrentDictionary<DateTime, bool>();
-
         #region Trading Holidays
 
         // Holidays which fall on a Saturday are observed on Friday, those which fall on Sunday are observed on Monday
@@ -241,19 +238,18 @@ namespace Finance
 
         #endregion
 
+        //
+        // Dictionary populated with known good trading dates as encountered to speed up future checks
+        //
+        private static ConcurrentDictionary<DateTime, bool> KnownTradingDays = new ConcurrentDictionary<DateTime, bool>();
+
         private static List<DateTime> NonStandardClosureDates = new List<DateTime>()
         {
             new DateTime(2018,12,5), // Former President GW Bush national day of mourning
             new DateTime(2012,10,29),  // Hurricane Sandy
             new DateTime(2012,10,30) // Hurricane Sandy
-
         };
 
-        /// <summary>
-        /// Determines whether or not a date is a valid market trading day
-        /// </summary>
-        /// <param name="date"></param>
-        /// <returns></returns>
         public static bool IsTradingDay(DateTime date)
         {
             try
@@ -303,42 +299,23 @@ namespace Finance
                 throw ex;
             }
         }
-
-        /// <summary>
-        /// Returns false if the date is a Saturday or Sunday
-        /// </summary>
-        /// <param name="date"></param>
-        /// <returns></returns>
-        private static bool IsWeekend(DateTime date)
+        public static bool IsWeekend(DateTime date)
         {
             return (date.DayOfWeek == DayOfWeek.Saturday || date.DayOfWeek == DayOfWeek.Sunday);
         }
 
-        /// <summary>
-        /// Return a list of all market closure, non-weekend days in the span
-        /// </summary>
-        /// <param name="start"></param>
-        /// <param name="end"></param>
-        /// <returns></returns>
-        public static List<DateTime> AllHolidays(DateTime start, DateTime end)
+        public static DateTime SettleDate(DateTime tradeDate, SecurityType securityType)
         {
-            List<DateTime> ret = new List<DateTime>();
-
-            while(start <= end)
+            switch (securityType)
             {
-                if (!IsWeekend(start) & !IsTradingDay(start))
-                    ret.Add(start);
-                start = start.AddDays(1);
+                case SecurityType.Unknown:
+                    return NextTradingDay(tradeDate, 2).Date;
+                case SecurityType.USCommonEquity:
+                    return NextTradingDay(tradeDate, 2).Date;
+                default:
+                    throw new Exception();
             }
-
-            return ret;
         }
-
-        /// <summary>
-        /// Returns the next valid trading day based on provided date and current calendar
-        /// </summary>
-        /// <param name="date"></param>
-        /// <returns></returns>
         public static DateTime NextTradingDay(DateTime date, int Days = 1)
         {
             DateTime ret = date.Date;
@@ -353,12 +330,14 @@ namespace Finance
 
             return ret;
         }
+        public static DateTime PriorTradingDay(DateTime date)
+        {
+            DateTime ret = date.AddDays(-1).Date;
+            while (!IsTradingDay(ret))
+                ret = ret.AddDays(-1);
 
-        /// <summary>
-        /// Returns the first trading day in the month and year provided by date
-        /// </summary>
-        /// <param name="date"></param>
-        /// <returns></returns>
+            return ret;
+        }
         public static DateTime FirstTradingDayOfMonth(DateTime date)
         {
             date = new DateTime(date.Year, date.Month, 1);
@@ -368,45 +347,19 @@ namespace Finance
             return date;
         }
 
-        /// <summary>
-        /// Returns appropriate settlement date based on conventions
-        /// </summary>
-        /// <param name="tradeDate"></param>
-        /// <param name="securityType"></param>
-        /// <returns></returns>
-        public static DateTime SettleDate(DateTime tradeDate, SecurityType securityType)
+        public static List<DateTime> AllHolidays(DateTime start, DateTime end)
         {
-            switch (securityType)
-            {
-                case SecurityType.Unknown:
-                    return NextTradingDay(tradeDate, 2).Date;
-                case SecurityType.USCommonEquity:
-                    return NextTradingDay(tradeDate, 2).Date;
-                default:
-                    throw new Exception();
-            }
-        }
+            List<DateTime> ret = new List<DateTime>();
 
-        /// <summary>
-        /// Returns the first prior valid trading day based on provided date and current calendar
-        /// </summary>
-        /// <param name="date"></param>
-        /// <returns></returns>
-        public static DateTime PriorTradingDay(DateTime date)
-        {
-            DateTime ret = date.AddDays(-1).Date;
-            DateTime breakDate = new DateTime(1999, 1, 1);
-            while (!IsTradingDay(ret) && ret > breakDate)
-                ret = ret.AddDays(-1);
-
-            if (ret < breakDate)
+            while (start <= end)
             {
-                string hmm = "hmm";
+                if (!IsWeekend(start) & !IsTradingDay(start))
+                    ret.Add(start);
+                start = start.AddDays(1);
             }
 
             return ret;
         }
-
     }
 
 }

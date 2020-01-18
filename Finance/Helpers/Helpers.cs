@@ -8,6 +8,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Windows.Forms;
+using System.Threading.Tasks;
 
 namespace Finance
 {
@@ -136,7 +137,7 @@ namespace Finance
             if (inclusive)
                 if (me.CompareTo(first) >= 0 && me.CompareTo(last) <= 0)
                     return true;
-            
+
             return false;
         }
 
@@ -474,6 +475,37 @@ namespace Finance
             }
 
             return Math.Round(averageCost, 3);
+        }
+
+        /// <summary>
+        /// Class which contains information about a system event to execute by appropriate handler
+        /// </summary>
+        public class SystemEventAction
+        {
+            public string EventName { get; }
+            public TimeSpan ExecutionTime { get; }
+            private Action ExecutionAction { get; }
+
+            public SystemEventAction(string name, TimeSpan executionTime, Action executionAction)
+            {
+                EventName = name;
+                ExecutionTime = executionTime;
+                ExecutionAction = executionAction ?? throw new ArgumentNullException(nameof(executionAction));
+            }
+            public void TryExecute()
+            {
+                try
+                {
+                    new Task(() => ExecutionAction()).Start();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log(new LogMessage($"SystemEvent -> {EventName}",
+                        $"Event execution failed: {ex.Message}", LogMessageType.Error));
+
+                    return;
+                }
+            }
         }
 
         #endregion
