@@ -1,5 +1,7 @@
 # Finance
 
+*See Wiki for additional detail
+
 Full-featured trading and strategy back-testing library.
 
 Main Functionality:
