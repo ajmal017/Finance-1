@@ -18,9 +18,9 @@ namespace Finance
         [Browsable(false)]
         private Portfolio portfolio { get; }
         [Browsable(false)]
-        private Tuple<DateTime, DateTime> SimulationTimeSpan { get; }
+        private (DateTime start, DateTime end) SimulationTimeSpan { get; }
 
-        public SimulationResults(Portfolio portfolio, Tuple<DateTime, DateTime> simulationTimeSpan)
+        public SimulationResults(Portfolio portfolio, (DateTime, DateTime) simulationTimeSpan)
         {
             this.portfolio = portfolio ?? throw new ArgumentNullException(nameof(portfolio));
             SimulationTimeSpan = simulationTimeSpan;
@@ -54,8 +54,10 @@ namespace Finance
         {
             get
             {
+                var returnPercent = Convert.ToDouble(TotalReturnPercent);
+                var dayHeldFraction = (365.0 / SimulationTotalDays);
 
-                return Convert.ToDecimal(Math.Pow((Convert.ToDouble(TotalReturnPercent)), (365.0 / SimulationTotalDays)));
+                return (Math.Pow((1 + returnPercent), (dayHeldFraction)) - 1).ToDecimal();
             }
         }
 
@@ -213,7 +215,6 @@ namespace Finance
                 return maxDraw;
             }
         }
-
         [DisplayFormat("$0.00")]
         public decimal MinAccountEquity
         {
@@ -230,7 +231,6 @@ namespace Finance
                 return DailyEquityBalances().Max();
             }
         }
-
         [DisplayFormat("###")]
         public decimal MaxOpenPositions
         {
@@ -249,24 +249,19 @@ namespace Finance
                 return maxPos;
             }
         }
-
         [DisplayFormat("0.00%")]
         public decimal WinningPositionPercent
         {
             get
             {
-
                 var numWin = (from pos in portfolio.GetPositions(PositionStatus.Closed, SimulationTimeSpan.Item2)
                               where pos.TotalReturnPercentage(SimulationTimeSpan.Item2) > 0
                               select pos.TotalReturnPercentage(SimulationTimeSpan.Item2)).ToList();
-                try
-                {
-                    return Convert.ToDecimal(numWin.Count) / portfolio.GetPositions(PositionStatus.Closed, SimulationTimeSpan.Item2).Count();
-                }
-                catch (DivideByZeroException)
-                {
-                    return 0;
-                }
+
+                var closedPositionCount = portfolio.GetPositions(PositionStatus.Closed, SimulationTimeSpan.Item2).Count();
+
+                return closedPositionCount == 0 ? 0 : Convert.ToDecimal(numWin.Count / closedPositionCount);
+
             }
         }
         [DisplayFormat("0.00%")]
@@ -340,7 +335,7 @@ namespace Finance
             {
                 var ret = portfolio.GetPositions(SimulationTimeSpan.Item2);
                 if (ret.Count > 0)
-                    return ret.Sum(x => x.TotalCommissionPaid(portfolio.Environment, SimulationTimeSpan.Item2));
+                    return ret.Sum(x => x.TotalCommissionPaid(SimulationTimeSpan.Item2));
 
                 return 0;
             }
@@ -359,6 +354,24 @@ namespace Finance
             }
         }
 
+        #region By Sector Performance
+
+        public List<SectorPerformanceResults> SectorResults()
+        {
+            var ret = new List<SectorPerformanceResults>();
+            foreach (string sector in Settings.Instance.MarketSectors)
+            {
+                var val = ret.AddAndReturn(new SectorPerformanceResults(sector, SimulationTimeSpan.end));
+                portfolio.GetPositions(SimulationTimeSpan.end).Where(p => p.Security.Sector == sector)
+                    .ToList().ForEach(p => val.AddPosition(p));
+            }
+
+            //ret.RemoveAll(s => s.PositionCount == 0);
+
+            return ret;
+        }
+
+        #endregion
     }
 
     /// <summary>
@@ -372,29 +385,29 @@ namespace Finance
             var ret = new List<string>
             {
                 string.Format($"Total days in simulation: {SimulationTotalDays}"),
-                string.Format($"Total Return: {TotalReturnPercent:%0.00}  Annualized Return: {AnnualizedReturnPercent:%0.00}"),
-
+                string.Format($"Total Return: {TotalReturnPercent:0.00%}"),
+                string.Format($"Annualized Return: { AnnualizedReturnPercent:0.00%}"),
                 string.Format($"Returns by month (full months only):")
             };
             string monRet = "";
             foreach (var m in MonthlyReturnsPercents())
             {
-                monRet += string.Format($"{m:%0.00}, ");
+                monRet += string.Format($"{m:0.00%}, ");
             }
             monRet.TrimEnd(',');
             ret.Add(string.Format($"{monRet}"));
 
-            ret.Add(string.Format($"Max: {MaxMonthlyReturnPercent:%0.0000}  Min: {MinMonthlyReturnPercent: %0.0000}"));
+            ret.Add(string.Format($"Max: {MaxMonthlyReturnPercent:0.00%}  Min: {MinMonthlyReturnPercent: 0.00%}"));
 
-            ret.Add(string.Format($"Maximum Drawdown: {MaxDrawdownDollars:$0.00}  ({MaxDrawdownPercent:%0.00}) Duration: {MaxDrawdownRecoveryLengthDays} days"));
+            ret.Add(string.Format($"Maximum Drawdown: {MaxDrawdownDollars:$0.00}  ({MaxDrawdownPercent:0.00%}) Duration: {MaxDrawdownRecoveryLengthDays} days"));
 
             ret.Add(string.Format($"Account equity:  Max {MaxAccountEquity:$0.00}  Min {MinAccountEquity:$0.00}"));
 
             ret.Add(string.Format($"Maximum open positions: {MaxOpenPositions}"));
 
-            ret.Add(string.Format($"Winning positions: {WinningPositionPercent:%0.0000}"));
+            ret.Add(string.Format($"Winning positions: {WinningPositionPercent:0.00%}"));
 
-            ret.Add(string.Format($"Average win: {AverageWinningPositionReturnPercent:%0.0000}  Average loss: {AverageLosingPositionReturnPercent:%0.00}"));
+            ret.Add(string.Format($"Average win: {AverageWinningPositionReturnPercent:0.00%}  Average loss: {AverageLosingPositionReturnPercent:0.00%}"));
 
             ret.Add(string.Format($"Total Unrealized PNL at end of simulation:{UnrealizedPnlEndOfSimulation:$0.00}"));
 
@@ -405,6 +418,58 @@ namespace Finance
             ret.Add(string.Format($"Total # of trades: {TotalTradesExecuted}"));
 
             return ret;
+        }
+    }
+
+    public class SectorPerformanceResults
+    {
+        private List<Position> SectorPositions { get; set; }
+
+        public string Sector { get; set; }
+        private DateTime EndDate { get; }
+
+        public int PositionCount => SectorPositions.Count;
+
+        public int WinningPositions => WinsLosses().wins;
+        public int LosingPositions => WinsLosses().losses;
+
+        public decimal AverageWinningPosition => AverageWinLoss().avgWin;
+        public decimal AverageLosingPosition => AverageWinLoss().avgLoss;
+
+        public SectorPerformanceResults(string sector, DateTime endDate)
+        {
+            EndDate = endDate;
+            Sector = sector ?? throw new ArgumentNullException(nameof(sector));
+            SectorPositions = new List<Position>();
+        }
+
+        public void AddPosition(Position position)
+        {
+            if (!SectorPositions.Contains(position))
+                SectorPositions.Add(position);
+        }
+
+        private (int wins, int losses) WinsLosses()
+        {
+            var wins = SectorPositions.Where(x =>
+                x.TotalRealizedPnL(EndDate) + x.TotalUnrealizedPnL(EndDate, TimeOfDay.MarketEndOfDay) > 0).Count();
+
+            var losses = SectorPositions.Where(x =>
+                x.TotalRealizedPnL(EndDate) + x.TotalUnrealizedPnL(EndDate, TimeOfDay.MarketEndOfDay) <= 0).Count();
+
+            return (wins, losses);
+        }
+        private (decimal avgWin, decimal avgLoss) AverageWinLoss()
+        {
+            var avgWin = (from pos in SectorPositions
+                          where pos.TotalReturnPercentage(EndDate) > 0
+                          select pos.TotalReturnPercentage(EndDate)).Average();
+
+            var avgLoss = (from pos in SectorPositions
+                           where pos.TotalReturnPercentage(EndDate) <= 0
+                           select pos.TotalReturnPercentage(EndDate)).Average();
+
+            return (avgWin, avgLoss);
         }
     }
 }

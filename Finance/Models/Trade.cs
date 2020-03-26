@@ -9,14 +9,19 @@ using static Finance.Helpers;
 
 namespace Finance
 {
-    [NotMapped]
-    public partial class Trade
+    public interface ITrade
+    {
+        int Quantity { get; set; }
+    }
+
+    public partial class Trade : ITrade
     {
 
-        public int TradeId { get; } = 0;
+        public int TradeId { get; set; } = 0;
 
         // Static Trade ID variable shared across all instances
         private static int _NextTradeId = 0;
+        [NotMapped]
         public static int NextTradeId
         {
             get { return ++_NextTradeId; }
@@ -27,6 +32,8 @@ namespace Finance
         public TradeActionBuySell TradeActionBuySell { get; set; }
         public TradeType TradeType { get; set; }
         public TradePriority TradePriority { get; set; }
+
+        public double TradePriorityScore { get; set; } = 0.0;
 
         private TradeStatus _TradeStatus;
         public TradeStatus TradeStatus
@@ -49,6 +56,8 @@ namespace Finance
             }
         }
 
+        public string TradeStatusMessage { get; set; }
+
         public DateTime TradeDate { get; set; }
 
         private DateTime _SettleDate { get; set; }
@@ -65,6 +74,7 @@ namespace Finance
 
         public decimal LimitPrice { get; set; } = 0m;
         public decimal StopPrice { get; set; } = 0m;
+        public decimal MarketPrice { get; set; } = 0m;
         public decimal ExecutedPrice { get; set; } = 0m;
 
         // Returns either stop or limit price depending on trade type
@@ -75,7 +85,7 @@ namespace Finance
                 switch (TradeType)
                 {
                     case TradeType.Market:
-                        throw new InvalidDataRequestException() { message = "Cannot determine expected execution price for Market type trade" };
+                        return MarketPrice;
                     case TradeType.Limit:
                         return LimitPrice;
                     case TradeType.Stop:
@@ -92,7 +102,8 @@ namespace Finance
             int quantity,
             TradeType tradeType,
             decimal limitPrice = 0,
-            decimal stopPrice = 0)
+            decimal stopPrice = 0,
+            decimal marketPrice = 0)
         {
 
             Security = security;
@@ -103,6 +114,9 @@ namespace Finance
             switch (tradeType)
             {
                 case TradeType.Market:
+                    if (marketPrice == 0)
+                        throw new InvalidTradeOperationException() { message = "Market trades must specify expected market price" };
+                    MarketPrice = marketPrice;
                     break;
                 case TradeType.Limit:
                     if (limitPrice == 0)
@@ -207,9 +221,8 @@ namespace Finance
 
             return ret;
         }
-
     }
-    
+
     public partial class Trade : IEquatable<Trade>
     {
         public override bool Equals(object obj)
@@ -240,7 +253,7 @@ namespace Finance
 
 
     }
-    
+
     /// <summary>
     /// Logging and output formatting
     /// </summary>

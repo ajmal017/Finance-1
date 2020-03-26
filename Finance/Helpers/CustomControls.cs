@@ -7,342 +7,18 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.IO;
+using System.Xml.Serialization;
 using System.Windows.Forms.DataVisualization.Charting;
+using Finance.TradeStrategies;
+using Finance.LiveTrading;
 using Timer = System.Windows.Forms.Timer;
+using static Finance.Helpers;
+using System.Data;
+using System.ComponentModel;
 
 namespace Finance
 {
-    #region System Clock
-
-    //
-    // Simple UI Components enabling display of a clock panel with user-selected Time Zones
-    //
-
-    public class SystemClock : Form
-    {
-        Size _formSize = new Size(0, 0); // This gets adjusted as controls are added
-        Timer tmrClockTimer;
-        List<TimeZoneInfo> timeZones;
-        Panel innerPanel;
-        MenuStrip menuStrip;
-        ToolStripMenuItem menuAddZone;
-
-        public SystemClock()
-        {
-            this.InitializeMe();
-            tmrClockTimer?.Start();
-        }
-
-        [Initializer]
-        private void SetMenuStrip()
-        {
-            menuStrip = new MenuStrip();
-            menuAddZone = new ToolStripMenuItem();
-
-            menuStrip.Name = "menu";
-            menuAddZone.Text = "Add";
-            menuAddZone.Click += (s, e) =>
-            {
-                (new TimeZoneSelector(this)).Show();
-            };
-
-            menuStrip.Items.Add(menuAddZone);
-            Controls.Add(menuStrip);
-        }
-        [Initializer]
-        private void SetStyle()
-        {
-            //
-            // Form
-            //
-            Size = _formSize;
-            FormBorderStyle = FormBorderStyle.FixedSingle;
-
-            //
-            // Inner Panel
-            //
-            innerPanel = new Panel();
-            Controls.Add(innerPanel);
-            innerPanel.DockTo(menuStrip, DockSide.Bottom, 0);
-        }
-        [Initializer]
-        private void SetDefaultTimeZone()
-        {
-            timeZones = new List<TimeZoneInfo>();
-            AddTimeZone(TimeZoneInfo.Local);
-        }
-        [Initializer]
-        private void SetTimerActions()
-        {
-            tmrClockTimer = new Timer();
-            tmrClockTimer.Interval = 1000 - DateTime.Now.Millisecond;
-            tmrClockTimer.Tick += (s, e) => { SetTimes(); };
-        }
-
-        private void SetDisplay()
-        {
-            SuspendLayout();
-            innerPanel.Controls.Clear();
-            foreach (TimeZoneInfo zone in timeZones)
-            {
-                var ctrl = new TimePanel(zone, (zone.Id == TimeZoneInfo.Local.Id ? true : false));
-                ctrl.Delete += (s, e) =>
-                {
-                    if (s is TimePanel t)
-                        RemoveTimeZone(t.timeZone);
-                };
-                innerPanel.Controls.Add(ctrl);
-
-                for (int i = 1; i < innerPanel.Controls.Count; i++)
-                    innerPanel.Controls[i].DockTo(innerPanel.Controls[i - 1], DockSide.Bottom, 0);
-
-                innerPanel.Height = innerPanel.Controls.Count * TimePanel._panelSize.Height;
-                innerPanel.Width = TimePanel._panelSize.Width;
-            }
-
-            Height = innerPanel.Height + menuStrip.Height + (Height - ClientRectangle.Height);
-            Width = innerPanel.Width + (Width - ClientRectangle.Width);
-
-            ResumeLayout();
-        }
-        private void SetTimes()
-        {
-            tmrClockTimer.Interval = 1000;
-            if (Visible)
-                Invoke(new Action(() =>
-                {
-                    foreach (Control ctrl in innerPanel.Controls)
-                    {
-                        if (ctrl is TimePanel t)
-                            t.UpdateDisplay(DateTime.Now);
-                    }
-                }));
-        }
-        public void AddTimeZone(TimeZoneInfo timeZone)
-        {
-            timeZones.Add(timeZone);
-            timeZones.Sort((x, y) => x.BaseUtcOffset.CompareTo(y.BaseUtcOffset));
-            SetDisplay();
-        }
-        public void AddTimeZone(string timeZoneId)
-        {
-            var tz = TimeZoneInfo.GetSystemTimeZones().First(x => x.Id == timeZoneId);
-            AddTimeZone(tz);
-        }
-        public void RemoveTimeZone(TimeZoneInfo timeZone)
-        {
-            timeZones.Remove(timeZone);
-            SetDisplay();
-        }
-        public void RemoveTimeZone(string timeZoneId)
-        {
-            var tz = TimeZoneInfo.GetSystemTimeZones().First(x => x.Id == timeZoneId);
-            RemoveTimeZone(tz);
-        }
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
-            base.OnPaint(e);
-        }
-
-    }
-    public class TimePanel : Panel
-    {
-        public event EventHandler Delete;
-        private void OnDelete() => Delete?.Invoke(this, null);
-
-        public TimeZoneInfo timeZone { get; }
-        public bool IsLocal { get; }
-        Label lblZone;
-        Label lblDate;
-        Label lblClock;
-        Label lblSeconds;
-        Label lblDelete;
-
-        public readonly static Size _panelSize = new Size(350, 125);
-
-        public TimePanel(TimeZoneInfo timeZone, bool isLocal = false)
-        {
-            this.timeZone = timeZone ?? throw new ArgumentNullException(nameof(timeZone));
-            IsLocal = isLocal;
-            this.InitializeMe();
-
-            UpdateDisplay(DateTime.Now);
-        }
-
-        [Initializer]
-        private void SetStyle()
-        {
-            lblZone = new Label();
-            lblDate = new Label();
-            lblClock = new Label();
-            lblSeconds = new Label();
-
-            //
-            // this Panel
-            //
-            BackColor = Color.Black;
-            Size = _panelSize;
-
-            //
-            // lblZone
-            //
-            lblZone.Font = Helpers.SystemFont(12, FontStyle.Bold);
-            lblZone.BackColor = IsLocal ? Color.DarkGreen : Color.DarkGoldenrod;
-            lblZone.ForeColor = IsLocal ? Color.LightGray : Color.Black;
-            lblZone.TextAlign = ContentAlignment.MiddleCenter;
-            lblZone.Size = new Size(_panelSize.Width, 25);
-            TimeSpan offset = timeZone.GetUtcOffset(DateTime.Now);
-            lblZone.Text = $"{timeZone.StandardName} (UTC{(offset < TimeSpan.Zero ? "-" : "+")}{offset:hh\\:mm})";
-
-            //
-            // lblDate
-            //
-            lblDate.Font = Helpers.SystemFont(10);
-            lblDate.ForeColor = Color.White;
-            lblDate.TextAlign = ContentAlignment.MiddleCenter;
-            lblDate.Size = new Size(_panelSize.Width, 15);
-
-            //
-            // lblClock
-            //
-            lblClock.Font = Helpers.SystemFont(48);
-            lblClock.ForeColor = IsLocal ? Color.Green : Color.DarkGoldenrod;
-            lblClock.TextAlign = ContentAlignment.MiddleCenter;
-            lblClock.Size = new Size(_panelSize.Width, 60);
-
-            //
-            // lblSeconds
-            //
-            lblSeconds.Font = Helpers.SystemFont(12);
-            lblSeconds.ForeColor = IsLocal ? Color.Green : Color.DarkGoldenrod;
-            lblSeconds.TextAlign = ContentAlignment.MiddleCenter;
-            lblSeconds.Size = new Size(50, 20);
-
-            //
-            // Add and Arrange
-            //
-            Controls.Add(lblZone);
-            Controls.Add(lblDate);
-            Controls.Add(lblClock);
-            Controls.Add(lblSeconds);
-
-            lblZone.Location = new Point(0, 0);
-            lblDate.DockTo(lblZone, DockSide.Bottom, 0);
-            lblClock.DockTo(lblDate, DockSide.Bottom, 0);
-            lblSeconds.Location = new Point(260, 83);
-            lblSeconds.BringToFront();
-        }
-        [Initializer]
-        private void SetDelete()
-        {
-            if (IsLocal) return;
-
-            lblDelete = new Label();
-            lblDelete.Size = new Size(15, 15);
-            lblDelete.Text = "X";
-            lblDelete.Font = Helpers.SystemFont(8);
-            lblDelete.BackColor = lblZone.BackColor;
-            lblDelete.ForeColor = Color.Black;
-
-            lblDelete.Click += (s, e) => OnDelete();
-
-            Controls.Add(lblDelete);
-            lblDelete.Location = new Point(this.Width - 15, 0);
-            lblDelete.BringToFront();
-        }
-
-        public void UpdateDisplay(DateTime time)
-        {
-            lblDate.Text = TimeZoneInfo.ConvertTime(time, timeZone).ToString("dddd, dd MMMM yyyy (MM/dd/yy)");
-            lblClock.Text = TimeZoneInfo.ConvertTime(time, timeZone).ToString(@"HH\:mm");
-            lblSeconds.Text = DateTime.Now.ToString(@".ss");
-
-            Refresh();
-        }
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
-            base.OnPaint(e);
-        }
-    }
-    public class TimeZoneSelector : Form
-    {
-        Size _formSize = new Size(300, 375);
-        Size _selectorSize = new Size(275, 275);
-        Size _buttonSize = new Size(125, 40);
-
-        ListBox listSelector;
-        Button btnAccept;
-        Button btnClose;
-
-        SystemClock clock;
-
-        public TimeZoneSelector(SystemClock clock)
-        {
-            this.clock = clock;
-            this.InitializeMe();
-            Show();
-        }
-        [Initializer]
-        private void SetStyle()
-        {
-            Size = _formSize;
-            FormBorderStyle = FormBorderStyle.FixedDialog;
-        }
-        [Initializer]
-        private void SetControls()
-        {
-            listSelector = new ListBox();
-            btnAccept = new Button();
-            btnClose = new Button();
-
-            //
-            // Selector
-            //
-            listSelector.Size = _selectorSize;
-            listSelector.DataSource = (TimeZoneInfo.GetSystemTimeZones());
-            listSelector.DisplayMember = "StandardName";
-            listSelector.ValueMember = "Id";
-
-            //
-            // Accept
-            //
-            btnAccept.Size = _buttonSize;
-            btnAccept.Text = "Add";
-            btnAccept.Click += (s, e) =>
-            {
-                if (listSelector.SelectedIndex != -1)
-                    this.clock?.AddTimeZone(listSelector.SelectedValue as string);
-            };
-
-            //
-            // Closer
-            //
-            btnClose.Size = _buttonSize;
-            btnClose.Text = "Close";
-            btnClose.Click += (s, e) =>
-            {
-                Close();
-            };
-
-            //
-            // Add and arrange
-            //
-            listSelector.Location = new Point(5, 10);
-
-            Controls.Add(listSelector);
-            Controls.Add(btnAccept);
-            Controls.Add(btnClose);
-
-            btnAccept.DockTo(listSelector, DockSide.Bottom, 5);
-            btnClose.DockTo(btnAccept, DockSide.Right, 25);
-
-        }
-
-    }
-
-    #endregion
     #region ControlManager
 
     /*
@@ -368,7 +44,6 @@ namespace Finance
             return issuedControls.AddAndReturn(_IssueControl());
         }
         protected abstract Control _IssueControl();
-
     }
 
     #endregion
@@ -380,7 +55,7 @@ namespace Finance
 
     public class StatusLabelControlManager : ControlManager
     {
-        private Tuple<string, Color> LastStatus = null;
+        private (string text, Color color)? LastStatus = null;
 
         public StatusLabelControlManager(string parentName) : base(parentName)
         {
@@ -390,7 +65,7 @@ namespace Finance
         {
             var ret = issuedControls.AddAndReturn(new StatusIndicatorLabel(ParentName, issuedControls.Count));
             if (LastStatus != null)
-                SetStatus(LastStatus.Item1, LastStatus.Item2);
+                SetStatus(LastStatus.Value.text, LastStatus.Value.color);
             return ret;
         }
 
@@ -404,7 +79,7 @@ namespace Finance
                     ctrl.SetStatus(text, color, displayName);
             }
 
-            LastStatus = new Tuple<string, Color>(text, color);
+            LastStatus = (text, color);
         }
     }
     public class StatusIndicatorLabel : Label
@@ -437,334 +112,605 @@ namespace Finance
     }
 
     #endregion
-    #region Parameter Display Panel
+    #region New Status Indicator Panel
 
-    /*
-     *  A Panel control which displays values from an object marked with ParameterAttribute
-     *  Provides interactive control for runtime-adjustment of parameter values    
-     */
-
-    public class ParameterDisplayUpdatePanel : Panel
-    {
-        Label lblValueName = new Label();
-        TextBox txtValue = new TextBox();
-        ToolTip tipValueDescription = new ToolTip();
-        Label lblMinMaxValues = new Label();
-
-        int _Height = 30;
-        Color backColor = Color.LightGray;
-
-        public ParameterDisplayUpdatePanel(PropertyInfo property, object target)
-        {
-            if (!Attribute.IsDefined(property, typeof(ParameterAttribute)))
-                throw new InvalidCastException();
-
-            Height = _Height;
-            BorderStyle = BorderStyle.FixedSingle;
-            BackColor = backColor;
-
-            AddValueName(property, target);
-            AddValueTextBox(property, target);
-            AddValueDescription(property, target);
-            AddMinMaxValue(property, target);
-
-            Arrange();
-        }
-
-        private void AddValueName(PropertyInfo property, object target)
-        {
-            var attr = property.GetCustomAttribute(typeof(ParameterAttribute)) as ParameterAttribute;
-
-            lblValueName.Width = 200;
-            lblValueName.Height = _Height;
-            lblValueName.Text = attr.ValueName;
-            lblValueName.TextAlign = ContentAlignment.MiddleLeft;
-            lblValueName.Font = Helpers.SystemFont(8);
-
-            Controls.Add(lblValueName);
-        }
-        private void AddValueTextBox(PropertyInfo property, object target)
-        {
-            var attr = property.GetCustomAttribute(typeof(ParameterAttribute)) as ParameterAttribute;
-
-            txtValue.Width = 75;
-            txtValue.Text = Convert.ToString(property.GetValue(target));
-            txtValue.TextAlign = HorizontalAlignment.Center;
-            txtValue.BorderStyle = BorderStyle.None;
-            txtValue.Font = Helpers.SystemFont(12);
-
-            string lastGoodValue = "";
-
-            // Select all when entering the text box
-            txtValue.Enter += (s, e) =>
-            {
-                lastGoodValue = txtValue.Text;
-                txtValue.SelectAll();
-            };
-
-            // Update target when enter is pressed
-            txtValue.KeyUp += (s, e) =>
-            {
-                if (e.KeyCode == Keys.Return)
-                    _UpdateControl();
-            };
-
-            // Update target when tab is pressed
-            txtValue.PreviewKeyDown += (s, e) =>
-            {
-                if (e.KeyCode == Keys.Tab)
-                    _UpdateControl();
-            };
-
-            // Local function updates control
-            void _UpdateControl()
-            {
-                if (txtValue.Text == lastGoodValue)
-                    return;
-
-                // Update
-                if (Helpers.ModifyParameterValue(property, target, txtValue.Text))
-                {
-                    // Flash control to give feedback that the value was updated
-                    BackColor = Color.LightGreen;
-                    new Task(() =>
-                    {
-                        Thread.Sleep(2000);
-                        Invoke(new Action(() =>
-                        {
-                            BackColor = backColor;
-                        }));
-                    }).Start();
-                    lastGoodValue = txtValue.Text;
-                    //Focus();
-                }
-                else
-                {
-                    // Flash control to give feedback that the value was NOT updated
-                    BackColor = Color.PaleVioletRed;
-                    new Task(() =>
-                    {
-                        Thread.Sleep(2000);
-                        Invoke(new Action(() =>
-                        {
-                            BackColor = backColor;
-                        }));
-                    }).Start();
-                    txtValue.Text = lastGoodValue;
-                    txtValue.SelectAll();
-                }
-            }
-
-            Controls.Add(txtValue);
-        }
-        private void AddValueDescription(PropertyInfo property, object target)
-        {
-            var attr = property.GetCustomAttribute(typeof(ParameterAttribute)) as ParameterAttribute;
-
-            tipValueDescription.ToolTipIcon = ToolTipIcon.None;
-            tipValueDescription.AutomaticDelay = 0;
-            tipValueDescription.IsBalloon = false;
-            tipValueDescription.ShowAlways = true;
-            tipValueDescription.SetToolTip(lblValueName, attr.ValueDescription);
-        }
-        private void AddMinMaxValue(PropertyInfo property, object target)
-        {
-            var attr = property.GetCustomAttribute(typeof(ParameterAttribute)) as ParameterAttribute;
-
-            lblMinMaxValues.Width = 100;
-            lblMinMaxValues.Height = _Height;
-            lblMinMaxValues.Text = attr.ToStringMinMaxValues();
-            lblMinMaxValues.TextAlign = ContentAlignment.MiddleLeft;
-            lblMinMaxValues.Font = Helpers.SystemFont(8);
-
-            Controls.Add(lblMinMaxValues);
-        }
-
-        private void Arrange()
-        {
-            int xOffset = 0;
-            foreach (Control control in Controls)
-            {
-                control.Location = new Point(xOffset, (Height - control.Height) / 2 - 1);
-                xOffset += control.Width;
-            }
-            Width = xOffset;
-        }
-    }
 
     #endregion
-    #region Strategy Display and Selection
+    #region Security List Box
 
-    /*
-     * Provides a Panel which displays information on a Strategy as stored in the StrategyManager
-     * list of available strategies.  Provides selection capabilities to select active strategy.
-     */
-
-    public class StrategyDisplayUpdatePanel : Panel
+    public class SecurityListGrid : Panel
     {
-        Label lblStrategyName = new Label();
-        Label lblStrategyDesc = new Label();
-        CheckBox chkActive = new CheckBox();
+        #region Events
 
-        int _Height = 60;
-        int _Width = 375;
-
-        public StrategyDisplayUpdatePanel(TradeStrategyBase strategy, StrategyManager manager)
+        public event SelectedSecurityChangedEventHandler SelectedSecurityChanged;
+        private void OnSelectedSecurityChanged()
         {
-            Height = _Height;
-            Width = _Width;
-            BorderStyle = BorderStyle.FixedSingle;
-
-            AddCheckBox(strategy, manager);
-            AddStrategyName(strategy, manager);
-            AddStrategyDesc(strategy, manager);
-
-            foreach (Control control in Controls)
-            {
-                control.Click += (s, e) => chkActive.Checked = true;
-            }
-
-            Arrange();
+            SelectedSecurityChanged?.Invoke(this, new SelectedSecurityEventArgs(this.SelectedSecurity));
         }
 
-        private void AddCheckBox(TradeStrategyBase strategy, StrategyManager manager)
-        {
-            chkActive.Name = "check";
-            chkActive.Size = new Size(20, 20);
+        #endregion
 
-            if (strategy == manager.ActiveTradeStrategy)
-            {
-                chkActive.Checked = true;
-                chkActive.Enabled = false;
-                BackColor = Color.LightGreen;
-            }
-            else
-            {
-                chkActive.Checked = false;
-                chkActive.Enabled = true;
-                BackColor = SystemColors.Control;
-            }
-
-            // Set strategy when the user selects
-            chkActive.CheckedChanged += (s, e) =>
-            {
-                if (chkActive.Checked)
-                    manager.SetStrategy(strategy);
-            };
-
-            // Update the active strategy when the checkmacrk is changed
-            manager.StrategyChanged += (s, e) =>
-            {
-                if (strategy == manager.ActiveTradeStrategy)
-                {
-                    BackColor = Color.LightGreen;
-                    chkActive.Enabled = false;
-                }
-                else
-                {
-                    BackColor = SystemColors.Control;
-                    chkActive.Checked = false;
-                    chkActive.Enabled = true;
-                }
-            };
-
-            Controls.Add(chkActive);
-        }
-        private void AddStrategyName(TradeStrategyBase strategy, StrategyManager manager)
-        {
-            lblStrategyName.Name = "name";
-            lblStrategyName.Width = _Width;
-            lblStrategyName.Font = Helpers.SystemFont(10);
-            lblStrategyName.Text = strategy.Name;
-
-            Controls.Add(lblStrategyName);
-        }
-        private void AddStrategyDesc(TradeStrategyBase strategy, StrategyManager manager)
-        {
-            lblStrategyDesc.Name = "desc";
-            lblStrategyDesc.Width = _Width;
-            lblStrategyDesc.Font = Helpers.SystemFont(8);
-            lblStrategyDesc.Text = strategy.Description;
-
-            Controls.Add(lblStrategyDesc);
-        }
-
-        private void Arrange()
-        {
-            Controls["check"].Location = new Point(4, 2);
-            int x1 = Controls["check"].Width;
-
-            Controls["name"].Location = new Point(4 + x1, 2);
-
-            Controls["desc"].Location = new Point(4, 2 + x1);
-        }
-    }
-
-    #endregion
-    #region Security List Display/Selector
-
-    public class SecurityListControlManager : ControlManager
-    {
-        private DataManager dataManagerRef { get; }
-        public SecurityListControlManager(DataManager dataManagerRef, string parentName) : base(parentName)
-        {
-            this.dataManagerRef = dataManagerRef ?? throw new ArgumentNullException(nameof(dataManagerRef));
-        }
-        protected override Control _IssueControl()
-        {
-            var ret = issuedControls.AddAndReturn(new SecurityListBox(ParentName, issuedControls.Count, dataManagerRef));
-
-            return ret;
-        }
-        public void UpdateLists()
-        {
-            foreach (SecurityListBox control in issuedControls)
-            {
-                control.UpdateList();
-            }
-        }
-    }
-    public class SecurityListBox : ListBox
-    {
-        private DataManager dataManager { get; }
-        public string DisplayName { get; set; }
+        private Security _SelectedSecurity { get; set; }
         public Security SelectedSecurity
         {
             get
             {
-                if (SelectedIndex == -1)
-                    return null;
-                return dataManager.GetSecurity(SelectedValue as string);
+                return _SelectedSecurity;
+            }
+            protected set
+            {
+                if (_SelectedSecurity != value)
+                {
+                    _SelectedSecurity = value;
+                    OnSelectedSecurityChanged();
+                }
             }
         }
 
-        public SecurityListBox(string name, int instance, DataManager dataManager)
+        Font _defaultFont = new Font("Calibri", 8);
+        Font _smallFont = new Font("Calibri", 7);
+
+        DataGridView securityGrid;
+        BindingSource bindingSource;
+
+        public SecurityListGrid()
         {
-            Name = name + instance.ToString();
-            DisplayName = Text = name;
-            BorderStyle = BorderStyle.FixedSingle;
-            SelectionMode = SelectionMode.One;
-            Font = Helpers.SystemFont(12);
-            Size = new Size(175, 250);
-            this.dataManager = dataManager;
-            DataSource = dataManager.GetAllTickers();
-            DoubleBuffered = true;
+            this.InitializeMe();
         }
-        public void UpdateList()
+
+        [Initializer]
+        private void InitializeGrid()
         {
-            if (InvokeRequired)
+            this.SuspendLayout();
+
+            securityGrid = new DataGridView()
             {
-                Invoke(new Action(() => { UpdateList(); }));
-            }
-            else
+                Dock = DockStyle.Fill,
+                AutoGenerateColumns = false,
+                AutoSize = false,
+                RowHeadersVisible = false,
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                AllowUserToOrderColumns = false,
+                AllowUserToResizeColumns = false,
+                AllowUserToResizeRows = false,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
+                ScrollBars = ScrollBars.Vertical,
+                ReadOnly = true,
+                Font = _defaultFont
+            };
+            this.Controls.Add(securityGrid);
+
+            //
+            // Add display value columns
+            //
+            securityGrid.Columns.Add("Ticker", "Ticker");
+            securityGrid.Columns["Ticker"].DataPropertyName = "Ticker";
+            securityGrid.Columns["Ticker"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            securityGrid.Columns["Ticker"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            securityGrid.Columns["Ticker"].FillWeight = 5;
+
+            securityGrid.Columns.Add("LongName", "Company");
+            securityGrid.Columns["LongName"].DataPropertyName = "LongName";
+            securityGrid.Columns["LongName"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            securityGrid.Columns["LongName"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            securityGrid.Columns["LongName"].FillWeight = 15;
+
+            securityGrid.Columns.Add("Industry", "Industry");
+            securityGrid.Columns["Industry"].DataPropertyName = "Industry";
+            securityGrid.Columns["Industry"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            securityGrid.Columns["Industry"].DefaultCellStyle.Font = _smallFont;
+            securityGrid.Columns["Industry"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            securityGrid.Columns["Industry"].FillWeight = 10;
+            securityGrid.Columns["Industry"].SortMode = DataGridViewColumnSortMode.Automatic;
+
+            securityGrid.Columns.Add("Sector", "Sector");
+            securityGrid.Columns["Sector"].DataPropertyName = "Sector";
+            securityGrid.Columns["Sector"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            securityGrid.Columns["Sector"].DefaultCellStyle.Font = _smallFont;
+            securityGrid.Columns["Sector"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            securityGrid.Columns["Sector"].FillWeight = 10;
+            securityGrid.Columns["Sector"].SortMode = DataGridViewColumnSortMode.Automatic;
+
+            securityGrid.Columns.Add("SicCode", "SIC");
+            securityGrid.Columns["SicCode"].DataPropertyName = "SicCodeName";
+            securityGrid.Columns["SicCode"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            securityGrid.Columns["SicCode"].DefaultCellStyle.Font = _smallFont;
+            securityGrid.Columns["SicCode"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            securityGrid.Columns["SicCode"].FillWeight = 20;
+            securityGrid.Columns["SicCode"].SortMode = DataGridViewColumnSortMode.Automatic;
+
+            securityGrid.Columns.Add("SecurityType", "Type");
+            securityGrid.Columns["SecurityType"].DataPropertyName = "SecurityType";
+            securityGrid.Columns["SecurityType"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            securityGrid.Columns["SecurityType"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            securityGrid.Columns["SecurityType"].FillWeight = 5;
+
+            securityGrid.Columns.Add("PercentChange_1day", "1 Day");
+            securityGrid.Columns["PercentChange_1day"].DataPropertyName = "PercentChange_1day";
+            securityGrid.Columns["PercentChange_1day"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            securityGrid.Columns["PercentChange_1day"].DefaultCellStyle.Format = "0.00%";
+            securityGrid.Columns["PercentChange_1day"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            securityGrid.Columns["PercentChange_1day"].FillWeight = 5;
+
+            securityGrid.Columns.Add("PercentChange_5day", "5 Day");
+            securityGrid.Columns["PercentChange_5day"].DataPropertyName = "PercentChange_5day";
+            securityGrid.Columns["PercentChange_5day"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            securityGrid.Columns["PercentChange_5day"].DefaultCellStyle.Format = "0.00%";
+            securityGrid.Columns["PercentChange_5day"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            securityGrid.Columns["PercentChange_5day"].FillWeight = 5;
+
+            securityGrid.Columns.Add("PercentChange_15day", "15 Day");
+            securityGrid.Columns["PercentChange_15day"].DataPropertyName = "PercentChange_15day";
+            securityGrid.Columns["PercentChange_15day"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            securityGrid.Columns["PercentChange_15day"].DefaultCellStyle.Format = "0.00%";
+            securityGrid.Columns["PercentChange_15day"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            securityGrid.Columns["PercentChange_15day"].FillWeight = 5;
+
+            securityGrid.Columns.Add("PercentChange_30day", "30 Day");
+            securityGrid.Columns["PercentChange_30day"].DataPropertyName = "PercentChange_30day";
+            securityGrid.Columns["PercentChange_30day"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            securityGrid.Columns["PercentChange_30day"].DefaultCellStyle.Format = "0.00%";
+            securityGrid.Columns["PercentChange_30day"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            securityGrid.Columns["PercentChange_30day"].FillWeight = 5;
+
+            securityGrid.Columns.Add("Flags", "CustomTags");
+            securityGrid.Columns["Flags"].DataPropertyName = "CustomTagsString";
+            securityGrid.Columns["Flags"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            securityGrid.Columns["Flags"].DefaultCellStyle.Font = _smallFont;
+            securityGrid.Columns["Flags"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            securityGrid.Columns["Flags"].FillWeight = 15;
+
+            this.ResumeLayout();
+        }
+
+        [Initializer]
+        private void InitializeEvents()
+        {
+
+            securityGrid.SelectionChanged += (s, e) =>
             {
-                string selectedTicker = SelectedValue as string;
-                DataSource = null;
-                DataSource = dataManager.GetAllTickers();
-                int i = (DataSource as List<string>).IndexOf(selectedTicker);
-                SelectedIndex = i;
-                Refresh();
+                if (securityGrid.SelectedCells.Count == 0)
+                    return;
+
+                SelectedSecurity = securityGrid.SelectedRows[0].DataBoundItem as Security;
+            };
+
+        }
+
+        public void LoadSecurityList()
+        {
+            bindingSource = new BindingSource();
+            bindingSource.DataSource = RefDataManager.Instance.GetAllSecurities();
+            securityGrid.DataSource = bindingSource;
+
+            securityGrid.CellFormatting += SecurityGrid_CellFormatting;
+        }
+
+        private void SecurityGrid_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.ColumnIndex == securityGrid.Columns["PercentChange_1day"].Index)
+            {
+                e.CellStyle.BackColor = (decimal)e.Value < 0 ? Color.PaleVioletRed : Color.PaleGreen;
             }
+            if (e.ColumnIndex == securityGrid.Columns["PercentChange_5day"].Index)
+            {
+                e.CellStyle.BackColor = (decimal)e.Value < 0 ? Color.PaleVioletRed : Color.PaleGreen;
+            }
+            if (e.ColumnIndex == securityGrid.Columns["PercentChange_15day"].Index)
+            {
+                e.CellStyle.BackColor = (decimal)e.Value < 0 ? Color.PaleVioletRed : Color.PaleGreen;
+            }
+            if (e.ColumnIndex == securityGrid.Columns["PercentChange_30day"].Index)
+            {
+                e.CellStyle.BackColor = (decimal)e.Value < 0 ? Color.PaleVioletRed : Color.PaleGreen;
+            }
+        }
+
+        public void FilterSecurityList(SecurityFilter filter)
+        {
+            SuspendLayout();
+
+            bindingSource.DataSource =
+                RefDataManager.Instance.GetAllSecurities().
+                Where(sec => filter.IndustryFilters.Contains(sec.Industry)).
+                Where(sec => filter.SectorFilters.Contains(sec.Sector)).
+                Where(sec => filter.SicFilters.Contains(sec.SicCode)).
+                Where(sec => filter.TypeFilters.Contains(sec.SecurityType)).
+                Where(sec => filter.ExcludeMissingData ? !sec.MissingData : true).
+                Where(sec => filter.FavoritesOnly ? sec.Favorite : true).
+                Where(sec => filter.ExcludeZeroVolume ? !sec.ZeroVolume : true).
+                Where(sec => filter.CurrentTrendFilters.Contains(sec.LastTrend()));
+
+            ResumeLayout();
+        }
+
+    }
+
+    public class SecurityFilterBox : Panel
+    {
+
+        #region Events
+
+        public event EventHandler SelectedFiltersChanged;
+        private void OnSelectedFiltersChanged()
+        {
+            SelectedFiltersChanged?.Invoke(this, new EventArgs());
+        }
+
+        #endregion
+
+        public SecurityFilter ActiveFilters { get; protected set; } = new SecurityFilter();
+
+        Size _defaultListSize = new Size(200, 300);
+        Size _defaultButtonSize = new Size(100, 25);
+
+        Font _defaultFont = new Font("Calibri", 8);
+
+        ListBox listIndustries;
+        ListBox listSectors;
+        ListBox listSicCodes;
+        ListBox listSecurityTypes;
+        ListBox listTrendTypes;
+
+        CheckBox chkExcludeMissingData;
+        CheckBox chkFavoritesOnly;
+        CheckBox chkExcludeZeroVolume;
+
+        Button btnApplyFilters;
+
+        public SecurityFilterBox()
+        {
+            this.InitializeMe();
+        }
+
+        [Initializer]
+        private void InitializeIndustriesListBox()
+        {
+            listIndustries = new ListBox()
+            {
+                SelectionMode = SelectionMode.MultiSimple,
+                Size = _defaultListSize,
+                Location = new Point(5, 25),
+                Font = _defaultFont
+            };
+            Label lblIndustries = new Label()
+            {
+                Text = "Selected Industries",
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            this.Controls.Add(listIndustries);
+            this.Controls.Add(lblIndustries);
+            lblIndustries.DockTo(listIndustries, ControlEdge.Top, 0);
+        }
+        [Initializer]
+        private void InitializeSectorsListBox()
+        {
+            listSectors = new ListBox()
+            {
+                SelectionMode = SelectionMode.MultiSimple,
+                Size = _defaultListSize,
+                Font = _defaultFont
+            };
+            Label lblSectors = new Label()
+            {
+                Text = "Selected Sectors",
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            this.Controls.Add(listSectors);
+            this.Controls.Add(lblSectors);
+            listSectors.DockTo(listIndustries, ControlEdge.Right, 10);
+            lblSectors.DockTo(listSectors, ControlEdge.Top, 0);
+        }
+        [Initializer]
+        private void InitializeSicCodeListBox()
+        {
+            listSicCodes = new ListBox()
+            {
+                SelectionMode = SelectionMode.MultiSimple,
+                Size = new Size(300, _defaultListSize.Height),
+                Font = _defaultFont
+            };
+            Label lblSic = new Label()
+            {
+                Text = "SIC Code",
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            this.Controls.Add(listSicCodes);
+            this.Controls.Add(lblSic);
+            listSicCodes.DockTo(listSectors, ControlEdge.Right, 10);
+            lblSic.DockTo(listSicCodes, ControlEdge.Top, 0);
+        }
+        [Initializer]
+        private void InitializeSecurityTypeListBox()
+        {
+            listSecurityTypes = new ListBox()
+            {
+                SelectionMode = SelectionMode.MultiSimple,
+                Size = new Size(100, 100),
+                Font = _defaultFont
+            };
+            Label lblType = new Label()
+            {
+                Text = "Type",
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            this.Controls.Add(listSecurityTypes);
+            this.Controls.Add(lblType);
+            listSecurityTypes.DockTo(listSicCodes, ControlEdge.Right, 10);
+            lblType.DockTo(listSecurityTypes, ControlEdge.Top, 0);
+        }
+        [Initializer]
+        private void InitializeTrendTypeListBox()
+        {
+            listTrendTypes = new ListBox()
+            {
+                SelectionMode = SelectionMode.MultiSimple,
+                Size = new Size(200, 125),
+                Font = _defaultFont
+            };
+            Label lblTrend = new Label()
+            {
+                Text = "Trend",
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            this.Controls.Add(listTrendTypes);
+            this.Controls.Add(lblTrend);
+            lblTrend.DockTo(listIndustries, ControlEdge.Bottom, 0);
+            listTrendTypes.DockTo(lblTrend, ControlEdge.Bottom, 0);
+        }
+        [Initializer]
+        private void InitializeSingleSelectionFilters()
+        {
+            //
+            // Exclude missing data
+            //
+            chkExcludeMissingData = new CheckBox()
+            {
+                Text = "Exclude Missing Data",
+                TextAlign = ContentAlignment.MiddleLeft,
+                Width = 200
+            };
+            chkExcludeMissingData.DockTo(listSecurityTypes, ControlEdge.Bottom, 5);
+            this.Controls.Add(chkExcludeMissingData);
+
+            //
+            // Favorites only
+            //
+            chkFavoritesOnly = new CheckBox()
+            {
+                Text = "Favorites",
+                TextAlign = ContentAlignment.MiddleLeft,
+                Width = 200
+            };
+            chkFavoritesOnly.DockTo(chkExcludeMissingData, ControlEdge.Bottom, 2);
+            this.Controls.Add(chkFavoritesOnly);
+
+            //
+            // Exclude zero volume
+            //
+            chkExcludeZeroVolume = new CheckBox()
+            {
+                Text = "Exclude Zero Volume",
+                TextAlign = ContentAlignment.MiddleLeft,
+                Width = 200
+            };
+            chkExcludeZeroVolume.DockTo(chkFavoritesOnly, ControlEdge.Bottom, 2);
+            this.Controls.Add(chkExcludeZeroVolume);
+        }
+        [Initializer]
+        private void InitializeApplyfilterButton()
+        {
+            btnApplyFilters = new Button()
+            {
+                Text = "Apply Filters",
+                Size = _defaultButtonSize
+            };
+            this.Controls.Add(btnApplyFilters);
+            btnApplyFilters.DockTo(chkExcludeZeroVolume, ControlEdge.Bottom, 10);
+
+            btnApplyFilters.Click += (s, e) => ApplyFilters();
+        }
+
+        public void LoadFilterValues()
+        {
+            //
+            // Industry List Filter
+            //
+            var industryList = (from sec in RefDataManager.Instance.GetAllSecurities()
+                                select sec.Industry).Distinct().ToList();
+
+            listIndustries.DataSource = industryList;
+            listIndustries.SelectedIndex = -1;
+
+            //
+            // Sector List Filter
+            //
+            var sectorList = (from sec in RefDataManager.Instance.GetAllSecurities()
+                              select sec.Sector).Distinct().ToList();
+
+            listSectors.DataSource = sectorList;
+            listSectors.SelectedIndex = -1;
+
+            //
+            // SIC Code List Filter
+            //
+            var sicList = Helpers.GetAllSICCodeStrings();
+
+            listSicCodes.DataSource = sicList;
+            listSicCodes.SelectedIndex = -1;
+
+            listSicCodes.SelectedIndexChanged += (s, e) =>
+            {
+                Console.WriteLine(listSicCodes.SelectedIndex);
+            };
+
+            //
+            // Type Filters
+            //
+            var typeList = (from sec in RefDataManager.Instance.GetAllSecurities()
+                            select Enum.GetName(typeof(SecurityType), sec.SecurityType)).Distinct().ToList();
+
+            listSecurityTypes.DataSource = typeList;
+            listSecurityTypes.SelectedIndex = -1;
+
+            //
+            // Trend Filters
+            //
+            var trendList = (from trendName in Enum.GetNames(typeof(TrendQualification)) select trendName).ToList();
+
+            listTrendTypes.DataSource = trendList;
+            listTrendTypes.SelectedIndex = -1;
+
+        }
+
+        private void ApplyFilters()
+        {
+            SetSelectedIndustries();
+            SetSelectedSectors();
+            SetSelectedSICs();
+            SetSelectedTypes();
+            SetSelectedTrends();
+            SetSingleSecurityFilters();
+
+            OnSelectedFiltersChanged();
+        }
+        private void SetSelectedIndustries()
+        {
+            var ret = new List<string>();
+            for (int i = 0; i < listIndustries.Items.Count; i++)
+            {
+                if (listIndustries.GetSelected(i))
+                    ret.Add(listIndustries.Items[i] as string);
+            }
+
+            // If nothing selected, return all values (no filters)
+            if (ret.Count == 0)
+            {
+                foreach (var val in listIndustries.Items)
+                    ret.Add(val as string);
+            }
+
+            ActiveFilters.ClearFilters(SecurityFilterType.Industry);
+            ret.ForEach(x =>
+            {
+                ActiveFilters.AddFilterValue(SecurityFilterType.Industry, x);
+            });
+        }
+        private void SetSelectedSectors()
+        {
+            var ret = new List<string>();
+            for (int i = 0; i < listSectors.Items.Count; i++)
+            {
+                if (listSectors.GetSelected(i))
+                    ret.Add(listSectors.Items[i] as string);
+            }
+
+            // If nothing selected, return all values (no filters)
+            if (ret.Count == 0)
+            {
+                foreach (var val in listSectors.Items)
+                    ret.Add(val as string);
+            }
+
+            ActiveFilters.ClearFilters(SecurityFilterType.Sector);
+            ret.ForEach(x =>
+            {
+                ActiveFilters.AddFilterValue(SecurityFilterType.Sector, x);
+            });
+        }
+        private void SetSelectedSICs()
+        {
+            var ret = new List<int>();
+            for (int i = 0; i < listSicCodes.Items.Count; i++)
+            {
+                if (listSicCodes.GetSelected(i))
+                {
+                    List<int> codes = Helpers.GetSICByIndustry(listSicCodes.Items[i] as string);
+                    ret.AddRange(codes);
+                }
+            }
+
+            // If nothing selected, return all values (no filters)
+            if (ret.Count == 0)
+            {
+                foreach (var val in listSicCodes.Items)
+                {
+                    List<int> codes = Helpers.GetAllSICCodeInts();
+                    ret.AddRange(codes);
+                }
+            }
+
+            ActiveFilters.ClearFilters(SecurityFilterType.SIC);
+            ret.ForEach(x =>
+            {
+                ActiveFilters.AddFilterValue(SecurityFilterType.SIC, x);
+            });
+        }
+        private void SetSelectedTypes()
+        {
+            var ret = new List<SecurityType>();
+            for (int i = 0; i < listSecurityTypes.Items.Count; i++)
+            {
+                if (listSecurityTypes.GetSelected(i))
+                {
+                    ret.Add((SecurityType)Enum.Parse(typeof(SecurityType), listSecurityTypes.Items[i] as string));
+                }
+            }
+
+            // If nothing selected, return all values (no filters)
+            if (ret.Count == 0)
+            {
+                foreach (var val in listSecurityTypes.Items)
+                {
+                    foreach (var type in Enum.GetValues(typeof(SecurityType)))
+                    {
+                        ret.Add((SecurityType)type);
+                    }
+                }
+            }
+
+            ActiveFilters.ClearFilters(SecurityFilterType.SecurityType);
+            ret.ForEach(x =>
+            {
+                ActiveFilters.AddFilterValue(SecurityFilterType.SecurityType, x);
+            });
+        }
+        private void SetSelectedTrends()
+        {
+            var ret = new List<TrendQualification>();
+            for (int i = 0; i < listTrendTypes.Items.Count; i++)
+            {
+                if (listTrendTypes.GetSelected(i))
+                {
+                    ret.Add((TrendQualification)Enum.Parse(typeof(TrendQualification), listTrendTypes.Items[i] as string));
+                }
+            }
+
+            // If nothing selected, return all values (no filters)
+            if (ret.Count == 0)
+            {
+                foreach (var val in listTrendTypes.Items)
+                {
+                    foreach (var type in Enum.GetValues(typeof(TrendQualification)))
+                    {
+                        ret.Add((TrendQualification)type);
+                    }
+                }
+            }
+
+            ActiveFilters.ClearFilters(SecurityFilterType.Trend);
+            ret.ForEach(x =>
+            {
+                ActiveFilters.AddFilterValue(SecurityFilterType.Trend, x);
+            });
+        }
+        private void SetSingleSecurityFilters()
+        {
+            ActiveFilters.ExcludeMissingData = chkExcludeMissingData.Checked;
+            ActiveFilters.FavoritesOnly = chkFavoritesOnly.Checked;
+            ActiveFilters.ExcludeZeroVolume = chkExcludeZeroVolume.Checked;
         }
 
     }
@@ -774,20 +720,19 @@ namespace Finance
 
     public class SecurityInfoPanel : Panel
     {
-        public Security security { get; private set; }
-        private DataManager dataManager { get; } = null;
+        public Security Security { get; private set; }
 
         GroupBox grpContents;
         Button btnUpdateSecurity;
 
-        Size _pnlSize = new Size(350, 250);
+        Size _defaultSize = new Size(350, 300);
 
-        public SecurityInfoPanel(Security security, DataManager dataManager = null)
+        public SecurityInfoPanel() { }
+        public SecurityInfoPanel(Security security)
         {
-            this.security = security;
-            this.dataManager = dataManager;
+            this.Security = security;
 
-            Size = _pnlSize;
+            Size = _defaultSize;
 
             //
             // Group Box to hold all controls
@@ -795,7 +740,7 @@ namespace Finance
             grpContents = new GroupBox()
             {
                 Text = "Security Data",
-                Size = new Size(_pnlSize.Width - 5, _pnlSize.Height - 5),
+                Size = new Size(_defaultSize.Width - 5, _defaultSize.Height - 5),
                 Location = new Point(2, 0)
             };
 
@@ -812,10 +757,10 @@ namespace Finance
             };
             btnUpdateSecurity.Click += (s, e) =>
             {
-                if (this.security == null || dataManager == null)
+                if (this.Security == null)
                     return;
 
-                dataManager.UpdateSecurity(this.security, DateTime.Today);
+                RefDataManager.Instance.UpdateSecurityPriceData(this.Security, DateTime.Today);
                 grpContents.Controls.Remove(btnUpdateSecurity);
 
                 Label lblUpdating = new Label()
@@ -831,21 +776,22 @@ namespace Finance
             //
             // Link datamanager callback to refresh
             //
-            if (this.dataManager != null)
+            RefDataManager.Instance.SecurityDataChanged += (s, e) =>
             {
-                this.dataManager.SecurityDataResponse += (s, e) =>
+                if (e.TryGetSecurity(this.Security.Ticker, out Security sec))
                 {
+                    this.Security = sec;
                     Redraw();
-                };
-            }
+                }
+            };
 
             Controls.Add(grpContents);
-
             Redraw();
         }
+
         public void Load(Security security)
         {
-            this.security = security;
+            this.Security = security;
             Redraw();
         }
         private void Redraw()
@@ -857,13 +803,23 @@ namespace Finance
             }
 
             grpContents.Controls.Clear();
-            if (security == null)
+            if (Security == null)
+            {
+                grpContents.Controls.Add(new Label()
+                {
+                    Text = "No Security in Database",
+                    Font = SystemFont(12, FontStyle.Bold),
+                    Location = new Point(5, 20),
+                    AutoSize = true
+                });
                 return;
+            }
+
 
             //
             // Get a list of all UI Output methods in Security (marked with Attribute)
             //
-            var methods = (from method in security.GetType().GetMethods()
+            var methods = (from method in Security.GetType().GetMethods()
                            where Attribute.IsDefined(method, typeof(UiDisplayTextAttribute))
                            select method).
                           OrderBy(x => ((UiDisplayTextAttribute)x.GetCustomAttribute(typeof(UiDisplayTextAttribute))).Order);
@@ -874,7 +830,7 @@ namespace Finance
             {
                 grpContents.Controls.Add(new Label()
                 {
-                    Text = field.Invoke(security, null) as string,
+                    Text = field.Invoke(Security, null) as string,
                     Width = (int)(grpContents.Width * .90),
                     Font = Helpers.SystemFont(8),
                     AutoEllipsis = true
@@ -886,17 +842,13 @@ namespace Finance
             //
             grpContents.Controls[0].Location = new Point(5, 20);
             for (int i = 1; i < grpContents.Controls.Count; i++)
-            {
-                grpContents.Controls[i].DockTo(grpContents.Controls[i - 1], DockSide.Bottom);
-            }
+                grpContents.Controls[i].DockTo(grpContents.Controls[i - 1], ControlEdge.Bottom);
 
             //
             // Add update button
             //
-            if (dataManager != null && !security.DataUpToDate)
-            {
+            if (!Security.DataUpToDate)
                 ShowUpdateButton();
-            }
 
             Refresh();
         }
@@ -907,821 +859,1152 @@ namespace Finance
     }
 
     #endregion
-    #region Finance Chart (Base Class)
+    #region Result Control Panel Components
+
+    public class ComponentPanelBase_1 : Panel
+    {
+        Size _defaultSize = new Size(200, 600);
+        public string Title { get; set; }
+
+        GroupBox grpBox;
+        Panel pnlContents;
+
+        public ComponentPanelBase_1(string title)
+        {
+            Title = title ?? throw new ArgumentNullException(nameof(title));
+        }
+
+        [Initializer]
+        private void InitializeBaseStyle()
+        {
+            Size = _defaultSize;
+
+            pnlContents = new Panel()
+            {
+                Dock = DockStyle.Fill
+            };
+
+            grpBox = new GroupBox()
+            {
+                Text = Title,
+                Dock = DockStyle.Fill
+            };
+
+            this.Controls.Add(grpBox);
+            grpBox.Controls.Add(pnlContents);
+
+            OverrideControlAdded = true;
+        }
+
+        protected void ClearContents()
+        {
+            pnlContents.Controls.Clear();
+        }
+
+        private bool OverrideControlAdded = false;
+        protected override void OnControlAdded(ControlEventArgs e)
+        {
+            base.OnControlAdded(e);
+
+            if (OverrideControlAdded)
+            {
+                this.Controls.Remove(e.Control);
+                this.pnlContents.Controls.Add(e.Control);
+
+                for (int i = 1; i < pnlContents.Controls.Count; i++)
+                {
+                    pnlContents.Controls[i].DockTo(pnlContents.Controls[i - 1], ControlEdge.Bottom, 5);
+                }
+            }
+        }
+    }
+
+    public class PositionListPanel : ComponentPanelBase_1
+    {
+        public Simulation Simulation { get; private set; }
+        public Security SelectedValue { get; private set; }
+
+        public event EventHandler SelectedValueChanged;
+        private void OnSelectedValueChanged()
+        {
+            SelectedValueChanged?.Invoke(this, null);
+        }
+
+        ListBox listPositions;
+
+        public PositionListPanel(string title, Simulation simulation) : base(title)
+        {
+            this.InitializeMe();
+
+            Simulation = simulation;
+            if (Simulation == null)
+                return;
+
+            InitializeList();
+        }
+
+        public void LoadSimulation(Simulation simulation)
+        {
+            Simulation = simulation;
+            if (Simulation == null)
+                return;
+
+            InitializeList();
+        }
+
+        private void InitializeList()
+        {
+            //
+            // List of positions from the duration of the simulation; filter to remove duplicate tickers
+            //
+            List<Position> positions = Simulation.PortfolioManager.Portfolio.GetPositions(Simulation.SimulationTimeSpan.Item2);
+            List<string> tickers = (from p in positions select p.Security.Ticker).Distinct().ToList();
+
+            //
+            // List Box
+            //
+            listPositions = new ListBox()
+            {
+                DataSource = tickers,
+                Dock = DockStyle.Fill
+            };
+            listPositions.SelectedIndex = -1;
+            listPositions.SelectedValueChanged += (s, e) =>
+            {
+                SelectedValue = (from p in positions
+                                 where p.Security.Ticker == listPositions.SelectedValue as string
+                                 select p.Security).FirstOrDefault();
+
+                OnSelectedValueChanged();
+            };
+
+            this.Controls.Add(listPositions);
+        }
+    }
+    public class AccountingSeriesSelectPanel : ComponentPanelBase_1
+    {
+        public AccountingSeriesValue SelectedValue { get; private set; }
+
+        public event EventHandler SelectedValueChanged;
+        private void OnSelectedValueChanged()
+        {
+            SelectedValueChanged?.Invoke(this, null);
+        }
+
+        ListBox listAccountingSeries;
+
+        public AccountingSeriesSelectPanel(string title) : base(title)
+        {
+            this.InitializeMe();
+        }
+
+        [Initializer]
+        private void InitializeList()
+        {
+            listAccountingSeries = new ListBox()
+            {
+                DataSource = Enum.GetNames(typeof(AccountingSeriesValue)),
+                Dock = DockStyle.Fill
+            };
+            listAccountingSeries.SelectedValueChanged += (s, e) =>
+            {
+                SelectedValue = (AccountingSeriesValue)Enum.Parse(typeof(AccountingSeriesValue), listAccountingSeries.SelectedValue as string);
+                OnSelectedValueChanged();
+            };
+
+            this.Controls.Add(listAccountingSeries);
+        }
+    }
+    public class PositionSummaryPanel : ComponentPanelBase_1
+    {
+        PositionSummary PositionSummary { get; set; }
+
+        public PositionSummaryPanel(string title) : base(title)
+        {
+            this.InitializeMe();
+        }
+
+        [Initializer]
+        private void InitializeStyle()
+        {
+            this.Controls.Add(new Label() { Text = "No Data" });
+        }
+
+        public void LoadPosition(Position position)
+        {
+            PositionSummary = new PositionSummary(position);
+            SetLabels();
+        }
+        public void LoadPosition(List<Position> positions)
+        {
+            PositionSummary = new PositionSummary(positions);
+            SetLabels();
+        }
+
+        private void SetLabels()
+        {
+            this.ClearContents();
+            if (PositionSummary == null)
+            {
+                this.Controls.Add(new Label() { Text = "No Data" });
+                return;
+            }
+
+            this.Controls.Add(new Label() { Text = JustifyStrings("Days Held:", PositionSummary.DaysHeld.ToString(), 30), AutoSize = true, Font = Helpers.SystemFont(8) });
+            this.Controls.Add(new Label() { Text = JustifyStrings("Trade Count:", PositionSummary.TradeCount.ToString(), 30), AutoSize = true, Font = Helpers.SystemFont(8) });
+            this.Controls.Add(new Label() { Text = JustifyStrings("Posn Count:", PositionSummary.PositionCount.ToString(), 30), AutoSize = true, Font = Helpers.SystemFont(8) });
+            this.Controls.Add(new Label() { Text = JustifyStrings("Net Return ($)", PositionSummary.NetReturnDollars.ToString("$0.00"), 30), AutoSize = true, Font = Helpers.SystemFont(8) });
+            this.Controls.Add(new Label() { Text = JustifyStrings("Net Return ($/Day)", PositionSummary.NetReturnPerDayDollars.ToString("$0.00"), 30), AutoSize = true, Font = Helpers.SystemFont(8) });
+            this.Controls.Add(new Label() { Text = JustifyStrings("Net Return (%)", PositionSummary.NetReturnPercent.ToString("0.00%"), 30), AutoSize = true, Font = Helpers.SystemFont(8) });
+            this.Controls.Add(new Label() { Text = JustifyStrings("Net Return (%/Day)", PositionSummary.NetReturnPerDayPercent.ToString("0.00%"), 30), AutoSize = true, Font = Helpers.SystemFont(8) });
+            this.Controls.Add(new Label() { Text = JustifyStrings("Annual Return (%)", PositionSummary.AnnualizedNetReturnPercent.ToString("0.00%"), 30), AutoSize = true, Font = Helpers.SystemFont(8) });
+
+            Refresh();
+        }
+    }
+    public class PositionDetailPanel : ComponentPanelBase_1
+    {
+        List<Position> Positions { get; set; }
+
+        public PositionDetailPanel(string title) : base(title)
+        {
+            Positions = new List<Position>();
+            this.InitializeMe();
+        }
+
+        [Initializer]
+        private void InitializeStyle()
+        {
+            this.Controls.Add(new Label() { Text = "No Data" });
+        }
+
+        public void LoadPosition(Position position)
+        {
+            Positions.Add(position);
+            SetLabels();
+        }
+        public void LoadPosition(List<Position> positions)
+        {
+            Positions.AddRange(positions);
+            SetLabels();
+        }
+        private void SetLabels()
+        {
+
+        }
+    }
+    public class AccountSummaryPanel : ComponentPanelBase_1
+    {
+
+        Simulation Simulation { get; set; }
+
+        public AccountSummaryPanel(string title, Simulation simulation) : base(title)
+        {
+            Simulation = simulation ?? throw new ArgumentNullException(nameof(simulation));
+            this.InitializeMe();
+        }
+
+        [Initializer]
+        private void InitializeResults()
+        {
+            SetLabels();
+        }
+
+        private void SetLabels()
+        {
+            this.ClearContents();
+            if (Simulation == null)
+                return;
+
+            SimulationResults results = Simulation.Results;
+
+            foreach (string resultString in results.ToString())
+            {
+                if (resultString.Contains("Returns by month"))
+                    continue;
+
+                this.Controls.Add(new Label()
+                {
+                    Text = resultString,
+                    Font = SystemFont(8),
+                    MaximumSize = new Size(275, 0),
+                    AutoSize = true
+                });
+            }
+        }
+    }
+
+    #endregion
+    #region ExpandoPanel
 
     /*
-     *  Custom Chart object which implements features which should be common to all chart 
-     *  controls used in the library.
+     *  Panel that expands to fit controls that are added
      */
 
-    public abstract class FinanceChart : Chart
+    public class ExpandoPanel : FlowLayoutPanel
     {
-        protected ChartArea chartArea;
+        int marginBuffer = 5;
 
-        protected static Size _chrtSize = new Size(1500, 1000);
-        protected static TimeSpan _defaultView = new TimeSpan(120, 0, 0, 0);
-        protected static TimeSpan _zoomStep = new TimeSpan(2, 0, 0, 0);
-
-        protected Point? cursorLocation = null;
-
-        protected Tuple<DateTime, DateTime> currentView;
-        protected Tuple<DateTime, double> currentCursorPoint = null;
-
-        protected bool Ready { get; set; } = false;
-        protected bool NoData { get; set; } = true;
-
-        [Initializer]
-        private void SetCursorLocation()
+        protected override void OnControlAdded(ControlEventArgs e)
         {
-            MouseMove += (s, e) =>
+            base.OnControlAdded(e);
+            foreach (Control ctrl in this.Controls)
             {
-                cursorLocation = e.Location;
-                Invalidate();
-            };
-        }
-        [Initializer]
-        private void SetDefaultStyles()
-        {
-            //
-            // Chart
-            //
-            Size = _chrtSize;
-            BackColor = SystemColors.Control;
-            DoubleBuffered = true;
-
-            //
-            // Chart Area
-            //
-            chartArea.BackColor = Color.Black;
-            chartArea.InnerPlotPosition.Auto = false;
-            chartArea.InnerPlotPosition.Width = 95;
-            chartArea.InnerPlotPosition.Height = 90;
-            chartArea.InnerPlotPosition.X = 5;
-            chartArea.InnerPlotPosition.Y = 0;
-
-            // Axis X Style
-            chartArea.AxisX.IntervalType = DateTimeIntervalType.Weeks;
-            chartArea.AxisX.IsStartedFromZero = false;
-            chartArea.AxisX.Interval = 1;
-            chartArea.AxisX.IntervalOffset = 1;
-            chartArea.AxisX.Title = "Date";
-            chartArea.AxisX.LabelStyle = new LabelStyle() { Format = "MM/dd/yy" };
-
-            chartArea.AxisX.MajorGrid.LineColor = Color.FromArgb(25, 25, 25);
-            chartArea.AxisX.MajorGrid.LineDashStyle = ChartDashStyle.Dot;
-            chartArea.AxisX.MajorGrid.LineWidth = 1;
-            chartArea.AxisX.MajorGrid.IntervalType = DateTimeIntervalType.Days;
-            chartArea.AxisX.MajorGrid.Interval = 1;
-
-            // Axis Y Style
-            chartArea.AxisY.IntervalType = DateTimeIntervalType.Number;
-            chartArea.AxisY.IsStartedFromZero = false;
-            chartArea.AxisY.LabelStyle.Format = "$0.00";
-            chartArea.AxisY.MajorGrid.LineColor = Color.FromArgb(25, 25, 25);
-            chartArea.AxisY.MajorGrid.LineDashStyle = ChartDashStyle.Dot;
-            chartArea.AxisY.MajorGrid.LineWidth = 1;
-            chartArea.AxisX.MajorGrid.IntervalOffset = -0.5;
-        }
-        [Initializer]
-        private void SetMouseScroll()
-        {
-            MouseWheel += ZoomTimeframeOnWheel;
-        }
-        [Initializer]
-        private void SetMouseDrag()
-        {
-            MouseMove += MoveTimeframeOnDrag;
-        }
-
-        protected abstract void Redraw();
-        public abstract void SetView(DateTime min, DateTime max);
-
-        private void ZoomTimeframeOnWheel(object sender, MouseEventArgs e)
-        {
-            SetZoomStep();
-
-            if (e.Delta < 0)
-                SetView(currentView.Item1.Add(-_zoomStep), currentView.Item2);
-            else
-                SetView(currentView.Item1.Add(+_zoomStep), currentView.Item2);
-
-            AdjustZoomedView();
-            Redraw();
-        }
-
-        private int lastPositionX { get; set; }
-        private void MoveTimeframeOnDrag(object sender, MouseEventArgs e)
-        {
-            if (e.Button == MouseButtons.Left)
-            {
-                // Drag the chart
-                int deltaMove = (lastPositionX - e.X);
-                SetDragView(deltaMove);
-            }
-
-            lastPositionX = e.X;
-        }
-        private void SetDragView(int deltaX)
-        {
-            double scaleFactor = 1.04;
-            var percentMove = scaleFactor * (deltaX / ((chartArea.InnerPlotPosition.Width / 100d) * Width));
-            var daysDrag = (currentView.Span().TotalDays * percentMove);
-
-            SetView(currentView.Item1.AddDays(daysDrag), currentView.Item2.AddDays(daysDrag));
-        }
-
-        private void SetZoomStep()
-        {
-            if (currentView.Span().TotalDays < 90)
-                _zoomStep = new TimeSpan(5, 0, 0, 0);
-            else if (currentView.Span().TotalDays < 180)
-                _zoomStep = new TimeSpan(7, 0, 0, 0);
-            else
-                _zoomStep = new TimeSpan(30, 0, 0, 0);
-        }
-        private void AdjustZoomedView()
-        {
-            //
-            // Change some global styles based on zoom level
-            //
-
-            // Remove X gridlines on views greater than 360 days
-            chartArea.AxisX.MajorGrid.Enabled = !(currentView.Span().TotalDays > 360);
-
-
-        }
-
-        protected void DrawWeekendStriplines()
-        {
-            StripLine slWeekend = new StripLine()
-            {
-                IntervalOffset = -1.5,
-                IntervalOffsetType = DateTimeIntervalType.Days,
-                Interval = 1,
-                IntervalType = DateTimeIntervalType.Weeks,
-                StripWidth = 2,
-                StripWidthType = DateTimeIntervalType.Days,
-                BackColor = Color.FromArgb(5, 5, 5),
-                BorderColor = Color.FromArgb(10, 10, 10)
-            };
-            chartArea.AxisX.StripLines.Add(slWeekend);
-        }
-        protected void DrawMonthStartStriplines()
-        {
-            StripLine slMonth = new StripLine()
-            {
-                IntervalOffset = -.5,
-                IntervalOffsetType = DateTimeIntervalType.Days,
-                Interval = 1,
-                IntervalType = DateTimeIntervalType.Months,
-                StripWidth = .10,
-                StripWidthType = DateTimeIntervalType.Days,
-                BackColor = Color.FromArgb(32, 32, 0),
-                BorderColor = Color.FromArgb(32, 32, 0)
-            };
-            chartArea.AxisX.StripLines.Add(slMonth);
-        }
-        protected void DrawYearStartStriplines()
-        {
-            StripLine slYear = new StripLine()
-            {
-                IntervalOffset = -.5,
-                IntervalOffsetType = DateTimeIntervalType.Days,
-                Interval = 1,
-                IntervalType = DateTimeIntervalType.Years,
-                StripWidth = .10,
-                StripWidthType = DateTimeIntervalType.Days,
-                BackColor = Color.FromArgb(128, 0, 0),
-                BorderColor = Color.FromArgb(128, 0, 0)
-            };
-            chartArea.AxisX.StripLines.Add(slYear);
-        }
-        protected void DrawHolidayStriplines()
-        {
-            foreach (DateTime holiday in Calendar.AllHolidays(DateTime.Today.AddYears(-10), DateTime.Today))
-            {
-                StripLine slHoliday = new StripLine()
+                if (ctrl.Right > (this.Width - marginBuffer))
                 {
-                    IntervalOffset = holiday.ToOADate() - 0.5,
-                    IntervalType = DateTimeIntervalType.Auto,
-                    StripWidth = 1,
-                    StripWidthType = DateTimeIntervalType.Days,
-                    BackColor = Color.FromArgb(25, 0, 25),
-                    BorderColor = Color.FromArgb(10, 10, 10),
+                    this.Width = ctrl.Right + marginBuffer;
+                }
+                if (ctrl.Bottom > (this.Height - marginBuffer))
+                {
+                    this.Height = ctrl.Bottom + marginBuffer;
                 };
-                chartArea.AxisX.StripLines.Add(slHoliday);
-            }
-
-        }
-
-        protected void SetCursorChartPoint(PaintEventArgs e)
-        {
-            if (cursorLocation.Value.X.IsBetween(0, Width, false) && cursorLocation.Value.Y.IsBetween(0, Height, false))
-            {
-                currentCursorPoint = new Tuple<DateTime, double>(
-                    DateTime.FromOADate(chartArea.AxisX.PixelPositionToValue(cursorLocation.Value.X)).AddHours(12).Date,
-                    chartArea.AxisY.PixelPositionToValue(cursorLocation.Value.Y));
-            }
-        }
-
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            base.OnPaint(e);
-
-            if (NoData) PaintNoData(e);
-
-            if (!Ready || cursorLocation == null)
-                return;
-
-            SetCursorChartPoint(e);
-        }
-        protected void PaintNoData(PaintEventArgs e)
-        {
-            using (SolidBrush brush = new SolidBrush(Color.FromArgb(35, 35, 35)))
-            {
-                Graphics g = e.Graphics;
-                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
-                g.DrawString($"No Data", Helpers.SystemFont(100), brush, Width / 3, Height / 3, new StringFormat());
-                return;
-            }
-        }
-        protected void PaintHorizontalCursorLine(PaintEventArgs e)
-        {
-            using (Pen pen = new Pen(Color.DimGray, 1))
-            {
-                // Draw Horizontal Line
-                Point pt1 = new Point(
-                    Convert.ToInt32(chartArea.AxisX.ValueToPixelPosition(currentView.Item1.ToOADate())),
-                    cursorLocation.Value.Y);
-
-                Point pt2 = new Point(
-                    Convert.ToInt32(chartArea.AxisX.ValueToPixelPosition(currentView.Item2.ToOADate())),
-                    cursorLocation.Value.Y);
-
-                e.Graphics.DrawLine(pen, pt1, pt2);
-            }
-        }
-        protected void PaintVerticalCursorLine(PaintEventArgs e)
-        {
-            using (Pen pen = new Pen(Color.DimGray, 1))
-            {
-                // Draw Vertical Line
-                Point pt1 = new Point(cursorLocation.Value.X,
-                    Convert.ToInt32(chartArea.AxisY.ValueToPixelPosition(chartArea.AxisY.Maximum)));
-
-                Point pt2 = new Point(cursorLocation.Value.X,
-                    Convert.ToInt32(chartArea.AxisY.ValueToPixelPosition(chartArea.AxisY.Minimum)));
-
-                e.Graphics.DrawLine(pen, pt1, pt2);
             }
         }
 
     }
 
     #endregion
-    #region Single Security Chart
+    #region Tiny Chart Sector Trend Panel
 
-    /*
-     *  Implementation of FinanceChart which displays a single Security as a candlestick chart (using SecuritSeries)
-     */
-
-    public class SingleSecurityChart : FinanceChart
+    public class SectorTrendPanel : Panel
     {
-        SecuritySeries securitySeries;
-        Security security;
-        PriceBarTooltip barTooltip;
 
-        static decimal _bufferYAxis = 0.05m;
+        public TrendIndex TrendIndex { get; protected set; }
+        public DateTime IndexDate { get; protected set; }
 
-        private BarSize currentBarSize { get; set; }
+        TinySectorTrendChart chart;
+        Panel pnlInnerChartPanel;
+        Label lblSectorName;
 
-        public SingleSecurityChart(Security security) : base()
+        public SectorTrendPanel()
         {
-            chartArea = new ChartArea("default");
-
             this.InitializeMe();
-
-            ChartAreas.Clear();
-            ChartAreas.Add(chartArea);
-
-            Load(security);
         }
 
         [Initializer]
-        private void SetStyles()
+        private void Initialize()
         {
-            //
-            // Default values are contained in base class
-            //
-            chartArea.AxisY.Title = "Share Price";
-
-            DrawWeekendStriplines();
-            DrawHolidayStriplines();
-            DrawMonthStartStriplines();
-            DrawYearStartStriplines();
-
-            MouseMove += DrawSelectionHighlightStripline;
-        }
-        [Initializer]
-        private void SetTooltip()
-        {
-            barTooltip = new PriceBarTooltip
+            pnlInnerChartPanel = new Panel()
             {
-                Visible = false
+                Width = this.Width,
+                Height = this.Height - 20,
+                Location = new Point(0, 20),
+                Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top | AnchorStyles.Bottom
             };
-            Controls.Add(barTooltip);
-            MouseMove += ShowPricebarTooltip;
+            this.Controls.Add(pnlInnerChartPanel);
+
+            chart = new TinySectorTrendChart()
+            {
+                Dock = DockStyle.Fill
+            };
+            pnlInnerChartPanel.Controls.Add(chart);
+
+            lblSectorName = new Label()
+            {
+                Location = new Point(5, 5),
+                Text = string.Empty,
+                AutoSize = true
+            };
+            this.Controls.Add(lblSectorName);
         }
 
-        protected override void Redraw()
+        public void LoadTrendIndex(TrendIndex trendIndex, DateTime indexDate)
         {
             if (InvokeRequired)
             {
-                Invoke(new Action(() => Redraw()));
-                return;
-            }
-
-            // Load Series into Chart Area
-            Series.Clear();
-            securitySeries.ChartArea = "default";
-            Series.Add(securitySeries);
-
-            // Set X
-            SetXAxis(currentView.Item1, currentView.Item2);
-
-            // Set Y
-            SetYAxis(securitySeries.MinY(currentView.Item1, currentView.Item2),
-                    securitySeries.MaxY(currentView.Item1, currentView.Item2));
-
-            // Refresh View
-            Update();
-
-            Ready = true;
-        }
-
-        private void SetXAxis(DateTime min, DateTime max)
-        {
-            chartArea.AxisX.Minimum = min.ToOADate();
-            chartArea.AxisX.Maximum = max.ToOADate();
-
-            switch (currentBarSize)
-            {
-                case BarSize.Daily:
-                    {
-                        chartArea.AxisX.IntervalType = DateTimeIntervalType.Weeks;
-                        chartArea.AxisX.IntervalOffset = 1;
-                        chartArea.AxisX.LabelStyle = new LabelStyle() { Format = "MM/dd/yy" };
-                    }
-                    break;
-                case BarSize.Weekly:
-                    {
-                        chartArea.AxisX.IntervalType = DateTimeIntervalType.Weeks;
-                        chartArea.AxisX.IntervalOffset = 1;
-                        chartArea.AxisX.LabelStyle = new LabelStyle() { Format = "MM/dd/yy" };
-                    }
-                    break;
-                case BarSize.Monthly:
-                    {
-                        chartArea.AxisX.IntervalType = DateTimeIntervalType.Months;
-                        chartArea.AxisX.IntervalOffset = 0;
-                        chartArea.AxisX.LabelStyle = new LabelStyle() { Format = "MMM yy" };
-                    }
-                    break;
-                default:
-                    break;
-            }
-        }
-        private void SetYAxis(decimal min, decimal max)
-        {
-            double minY = (min * (1 - _bufferYAxis)).ToDouble();
-            double maxY = (max * (1 + _bufferYAxis)).ToDouble();
-
-            minY = Math.Floor(minY);
-            maxY = Math.Ceiling(maxY);
-
-            chartArea.AxisY.Minimum = minY;
-            chartArea.AxisY.Maximum = maxY;
-
-            // Display interval lines rounded to nearest whole value depending on share price
-            double IntervalSpan = (chartArea.AxisY.Maximum - chartArea.AxisY.Minimum);
-            chartArea.AxisY.Interval = Math.Floor(IntervalSpan / 5);
-        }
-        private void SetSeriesZoomLevel()
-        {
-            if (currentView.Span().TotalDays < 360)
-            {
-                if (currentBarSize != BarSize.Daily)
-                    currentBarSize = BarSize.Daily;
-            }
-            else if (currentView.Span().TotalDays < 720)
-            {
-                if (currentBarSize != BarSize.Weekly)
-                    currentBarSize = BarSize.Weekly;
-            }
-            else if (currentView.Span().TotalDays >= 720)
-            {
-                if (currentBarSize != BarSize.Monthly)
-                    currentBarSize = BarSize.Monthly;
-            }
-
-            if (securitySeries.BarSize != currentBarSize)
-            {
-                securitySeries.SelectSeries(currentBarSize);
-                SetZoomLevelOptions();
-            }
-        }
-        private void SetZoomLevelOptions()
-        {
-            //
-            // Adjust Stripline Options
-            //
-            chartArea.AxisX.StripLines.Clear();
-            switch (currentBarSize)
-            {
-                case BarSize.Daily:
-                case BarSize.Weekly:
-                    DrawWeekendStriplines();
-                    DrawHolidayStriplines();
-                    DrawMonthStartStriplines();
-                    DrawYearStartStriplines();
-                    break;
-                case BarSize.Monthly:
-                    DrawYearStartStriplines();
-                    break;
-                default:
-                    break;
-            }
-        }
-        private void ShowPricebarTooltip(object sender, EventArgs e)
-        {
-            if (HitTest(cursorLocation.Value.X, cursorLocation.Value.Y).ChartElementType == ChartElementType.DataPoint)
-            {
-                PriceBar bar = (HitTest(cursorLocation.Value.X, cursorLocation.Value.Y).Object as DataPoint).Tag as PriceBar;
-
-                if (barTooltip.Visible && bar == barTooltip.PriceBar)
-                    return;
-                else
+                Invoke(new Action(() =>
                 {
-                    barTooltip.Location = cursorLocation.Value - barTooltip.Size;
-                    barTooltip.Show(bar);
-                }
-            }
-            else
-            {
-                barTooltip.Hide();
-            }
-        }
-
-        public void Load(Security security)
-        {
-            if (security == null) return;
-
-            Ready = false;
-            this.security = security;
-            securitySeries = security.ToChartSeries();
-
-            if (!securitySeries.HasPoints)
-            {
-                securitySeries = SecuritySeries.Default();
-                NoData = true;
-            }
-            else
-                NoData = false;
-
-            // Set current view based on points available
-            if (securitySeries.MinX > securitySeries.MaxX.Subtract(_defaultView))
-                currentView = new Tuple<DateTime, DateTime>(securitySeries.MinX, securitySeries.MaxX);
-            else
-                currentView = new Tuple<DateTime, DateTime>(securitySeries.MaxX.Subtract(_defaultView), securitySeries.MaxX);
-
-            if (securitySeries.Points.Count > 0)
-                Redraw();
-        }
-        public override void SetView(DateTime min, DateTime max)
-        {
-            if (!min.IsBetween(securitySeries.MinX, securitySeries.MaxX, false))
+                    LoadTrendIndex(trendIndex, indexDate);
+                }));
                 return;
-
-            currentView = new Tuple<DateTime, DateTime>(min, max);
-            SetSeriesZoomLevel();
-            Redraw();
-        }
-
-        #region Chart Visual Effects
-
-        //
-        // Striplines highlighting the day under the cursor
-        //
-        private List<StripLine> selectionHighlightLines = new List<StripLine>();
-        private void DrawSelectionHighlightStripline(object sender, MouseEventArgs e)
-        {
-            //
-            // Add a stripline highlighting the selected time we are hovering over
-            //
-            if (!Ready || currentCursorPoint == null) return;
-
-            if (selectionHighlightLines.Count > 0)
-                selectionHighlightLines.ForEach(x => chartArea.AxisX.StripLines.Remove(x));
-            selectionHighlightLines.Clear();
-
-            StripLine slHighlight = new StripLine()
-            {
-                IntervalType = DateTimeIntervalType.Auto,
-                BackColor = Color.FromArgb(0, 25, 0),
-                BorderColor = Color.FromArgb(10, 10, 10)
-            };
-
-            switch (currentBarSize)
-            {
-                case BarSize.Daily:
-                    {
-                        slHighlight.IntervalOffset = currentCursorPoint.Item1.ToOADate() - 0.5;
-                        slHighlight.StripWidthType = DateTimeIntervalType.Days;
-                        slHighlight.StripWidth = 1;
-                    }
-                    break;
-                case BarSize.Weekly:
-                    {
-                        slHighlight.IntervalOffset = currentCursorPoint.Item1.ToOADate() - currentCursorPoint.Item1.DayOfWeek.ToInt();
-                        slHighlight.StripWidthType = DateTimeIntervalType.Days;
-                        slHighlight.StripWidth = 5;
-                    }
-                    break;
-                case BarSize.Monthly:
-                    {
-                        // TODO: Fix this
-                        slHighlight.IntervalOffset = new DateTime(currentCursorPoint.Item1.Year, currentCursorPoint.Item1.Month, 15).ToOADate();
-                        slHighlight.StripWidthType = DateTimeIntervalType.Months;
-                        slHighlight.StripWidth = 1;
-                    }
-                    break;
-                default:
-                    break;
             }
 
-            selectionHighlightLines.Add(slHighlight);
-            selectionHighlightLines.ForEach(x => chartArea.AxisX.StripLines.Add(x));
+            this.TrendIndex = trendIndex;
+            this.IndexDate = indexDate;
+
+            chart.LoadTrendIndex(this.TrendIndex, this.IndexDate);
+            lblSectorName.Text = trendIndex.IndexName;
+
+            chart.Invalidate();
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        public void LoadTrendDate(DateTime indexDate)
         {
-            base.OnPaint(e);
-
-            if (!Ready || cursorLocation == null)
-                return;
-
-            //
-            // Draw Axis Lines
-            //
-            PaintHorizontalCursorLine(e);
-
-            //
-            // Draw Axis labels               
-            //
-            PaintAxisXLabel(e);
-            PaintAxisYLabel(e);
-        }
-        protected void PaintAxisXLabel(PaintEventArgs e)
-        {
-            Point pt1 = new Point(
-                cursorLocation.Value.X,
-                Convert.ToInt32(chartArea.AxisY.ValueToPixelPosition(chartArea.AxisY.Minimum)));
-
-            using (SolidBrush brush = new SolidBrush(Color.White))
+            if (InvokeRequired)
             {
-                Graphics g = e.Graphics;
-                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
-
-                switch (currentBarSize)
+                Invoke(new Action(() =>
                 {
-                    case BarSize.Daily:
-                        g.DrawString($"{currentCursorPoint.Item1:ddd MM/dd/yy}", Helpers.SystemFont(12), brush, cursorLocation.Value.X, pt1.Y - 20);
-                        break;
-                    case BarSize.Weekly:
-                        DateTime displayDate = currentCursorPoint.Item1.AddDays(-currentCursorPoint.Item1.DayOfWeek.ToInt());
-                        g.DrawString($"{displayDate:dd MMM}-{displayDate.AddDays(4):dd MMM yy}", Helpers.SystemFont(12), brush, cursorLocation.Value.X, pt1.Y - 20);
-                        break;
-                    case BarSize.Monthly:
-                        g.DrawString($"{currentCursorPoint.Item1:MMM yy}", Helpers.SystemFont(12), brush, cursorLocation.Value.X, pt1.Y - 20);
-                        break;
-                    default:
-                        break;
-                }
+                    LoadTrendDate(indexDate);
+                }));
+                return;
             }
-        }
-        protected void PaintAxisYLabel(PaintEventArgs e)
-        {
-            Point pt1 = new Point(
-                Convert.ToInt32(chartArea.AxisX.ValueToPixelPosition(currentView.Item1.ToOADate())),
-                cursorLocation.Value.Y);
 
-            using (SolidBrush brush = new SolidBrush(Color.White))
-            {
-                Graphics g = e.Graphics;
-                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
-                g.DrawString($"{currentCursorPoint.Item2:$0.00}", Helpers.SystemFont(12), brush, pt1.X, cursorLocation.Value.Y);
-            }
+            this.IndexDate = indexDate;
+            chart.LoadTrendIndex(this.TrendIndex, this.IndexDate);
+            chart.Invalidate();
         }
+
+    }
+
+    #endregion
+    #region Live Trading
+
+    public class LiveQuotePanel : UserControl
+    {
+
+        #region Events
 
         #endregion
-    }
-    public class SecuritySeries : Series
-    {
-        public DateTime MinX { get => DateTime.FromOADate((from pt in Points select pt.XValue).Min()); }
-        public DateTime MaxX { get => DateTime.FromOADate((from pt in Points select pt.XValue).Max()); }
-        public decimal MinY(DateTime start, DateTime end)
+
+        Size _defaultSize = new Size(400, 250);
+
+        Label lblSymbol;
+
+        Panel pnlBid;
+        Panel pnlAsk;
+        Panel pnlLastTrade;
+        Panel pnlChange;
+
+        Label lblBidPrice;
+        Label lblAskPrice;
+        Label lblLastTradePrice;
+
+        Label lblBidVolume;
+        Label lblAskVolume;
+        Label lblLastTradeVolume;
+
+        Label lblBidTime;
+        Label lblAskTime;
+        Label lblLastTradeTime;
+
+        Label lblPriorClose;
+        Label lblSpread;
+        Label lblChangeDollars;
+        Label lblChangePercent;
+
+        public Security ActiveSecurity { get; private set; }
+        private decimal open { get; set; } = -1;
+        private decimal lastBid { get; set; } = -1;
+        private decimal lastAsk { get; set; } = -1;
+        private decimal lastTrade { get; set; } = -1;
+
+        public LiveQuotePanel()
         {
-            return (from pt in Points
-                    where DateTime.FromOADate(pt.XValue).IsBetween(start, end)
-                    where pt.YValues.Count() > 0
-                    select pt.YValues.Min()).Min().ToDecimal();
+            this.InitializeMe();
         }
-        public decimal MaxY(DateTime start, DateTime end)
+
+        [Initializer]
+        private void InitializeStyles()
         {
-            return (from pt in Points
-                    where DateTime.FromOADate(pt.XValue).IsBetween(start, end)
-                    where pt.YValues.Count() > 0
-                    select pt.YValues.Max()).Max().ToDecimal();
-        }
-        public PriceBar FromXValue(DateTime X)
-        {
-            return priceBars.FirstOrDefault(x => x.BarDateTime == X);
-        }
-        public bool HasPoints
-        {
-            get
+            this.Size = _defaultSize;
+            this.BackColor = Color.Black;
+            this.MinimumSize = this.MaximumSize = _defaultSize;
+
+            lblSymbol = new Label()
             {
-                return (Points.Count > 0);
+                Text = "-",
+                Dock = DockStyle.Top,
+                Font = SystemFont(26, FontStyle.Bold),
+                ForeColor = Color.White,
+                Height = 50,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            this.Controls.Add(lblSymbol);
+        }
+
+        [Initializer]
+        private void InitializeBidAskDiplay()
+        {
+            //
+            // BID
+            //
+            pnlBid = new Panel()
+            {
+                Width = this.Width / 3,
+                Height = 125,
+                BackColor = this.BackColor,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+            Label lblBid = new Label()
+            {
+                Text = "BID",
+                ForeColor = Color.Red,
+                Font = SystemFont(12, FontStyle.Bold),
+                Dock = DockStyle.Top,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            lblBidPrice = new Label()
+            {
+                Name = "BidPrice",
+                Text = "$0.00",
+                ForeColor = Color.Red,
+                Font = SystemFont(16, FontStyle.Bold),
+                Width = pnlBid.Width,
+                Height = 50,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 20),
+            };
+            lblBidVolume = new Label()
+            {
+                Name = "BidVolume",
+                Text = "0",
+                ForeColor = Color.Goldenrod,
+                Font = SystemFont(12, FontStyle.Bold),
+                Width = pnlBid.Width,
+                Height = 25,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 70)
+            };
+            lblBidTime = new Label()
+            {
+                Name = "BidTime",
+                Text = @"MM/dd/yy hh:mm:ss",
+                ForeColor = Color.Goldenrod,
+                Font = SystemFont(8, FontStyle.Bold),
+                Width = pnlBid.Width,
+                Height = 20,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 100)
+            };
+
+            //
+            // Last Trade
+            //
+            pnlLastTrade = new Panel()
+            {
+                Width = this.Width / 3,
+                Height = 125,
+                BackColor = this.BackColor,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+            Label lblLastTrade = new Label()
+            {
+                Text = "LAST",
+                ForeColor = Color.White,
+                Font = SystemFont(12, FontStyle.Bold),
+                Dock = DockStyle.Top,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            lblLastTradePrice = new Label()
+            {
+                Name = "LastPrice",
+                Text = "$0.00",
+                ForeColor = Color.White,
+                Font = SystemFont(16, FontStyle.Bold),
+                Width = pnlLastTrade.Width,
+                Height = 50,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 20),
+            };
+            lblLastTradeVolume = new Label()
+            {
+                Name = "LastVolume",
+                Text = "0",
+                ForeColor = Color.Goldenrod,
+                Font = SystemFont(12, FontStyle.Bold),
+                Width = pnlBid.Width,
+                Height = 25,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 70)
+            };
+            lblLastTradeTime = new Label()
+            {
+                Name = "LastTime",
+                Text = @"MM/dd/yy hh:mm:ss",
+                ForeColor = Color.Goldenrod,
+                Font = SystemFont(8, FontStyle.Bold),
+                Width = pnlBid.Width,
+                Height = 20,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 100)
+            };
+
+            //
+            // ASK
+            //
+            pnlAsk = new Panel()
+            {
+                Width = this.Width / 3,
+                Height = 125,
+                BackColor = this.BackColor,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+            Label lblAsk = new Label()
+            {
+                Text = "ASK",
+                ForeColor = Color.LawnGreen,
+                Font = SystemFont(12, FontStyle.Bold),
+                Dock = DockStyle.Top,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            lblAskPrice = new Label()
+            {
+                Name = "AskPrice",
+                Text = "$0.00",
+                ForeColor = Color.LawnGreen,
+                Font = SystemFont(16, FontStyle.Bold),
+                Width = pnlAsk.Width,
+                Height = 50,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 20),
+            };
+            lblAskVolume = new Label()
+            {
+                Name = "AskVolume",
+                Text = "0",
+                ForeColor = Color.Goldenrod,
+                Font = SystemFont(12, FontStyle.Bold),
+                Width = pnlAsk.Width,
+                Height = 25,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 70)
+            };
+            lblAskTime = new Label()
+            {
+                Name = "AskTime",
+                Text = @"MM/dd/yy hh:mm:ss",
+                ForeColor = Color.Goldenrod,
+                Font = SystemFont(8, FontStyle.Bold),
+                Width = pnlAsk.Width,
+                Height = 20,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 100)
+            };
+
+            pnlBid.Controls.AddRange(new[] { lblBid, lblBidPrice, lblBidVolume, lblBidTime });
+            pnlLastTrade.Controls.AddRange(new[] { lblLastTrade, lblLastTradePrice, lblLastTradeVolume, lblLastTradeTime });
+            pnlAsk.Controls.AddRange(new[] { lblAsk, lblAskPrice, lblAskVolume, lblAskTime });
+
+            pnlBid.Location = new Point(0, 50);
+            pnlLastTrade.DockTo(pnlBid, ControlEdge.Right, 0);
+            pnlAsk.DockTo(pnlLastTrade, ControlEdge.Right, 0);
+
+            this.Controls.AddRange(new[] { pnlBid, pnlLastTrade, pnlAsk });
+        }
+
+        [Initializer]
+        private void InitializePriceChangeDisplay()
+        {
+            pnlChange = new Panel()
+            {
+                Size = new Size(_defaultSize.Width, 75),
+                Location = new Point(0, 175),
+                BackColor = this.BackColor,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+
+            //
+            // Last Close
+            //
+            Label lblOpenTitle = new Label()
+            {
+                Text = "Last Close",
+                ForeColor = Color.Gray,
+                Font = SystemFont(8, FontStyle.Bold),
+                Margin = new Padding(0),
+                Padding = new Padding(0),
+                Height = 16,
+                Width = this.Width / 2
+            };
+            lblPriorClose = new Label()
+            {
+                Text = "$-",
+                ForeColor = Color.Goldenrod,
+                Font = SystemFont(10, FontStyle.Bold),
+                Height = 20,
+                Width = this.Width / 2,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            //
+            // Spread
+            //
+            Label lblSpreadTitle = new Label()
+            {
+                Text = "Spread",
+                ForeColor = Color.Gray,
+                Font = SystemFont(8, FontStyle.Bold),
+                Margin = new Padding(0),
+                Padding = new Padding(0),
+                Height = 16,
+                Width = this.Width / 2
+            };
+            lblSpread = new Label()
+            {
+                Text = "$-",
+                ForeColor = Color.Goldenrod,
+                Font = SystemFont(10, FontStyle.Bold),
+                Height = 20,
+                Width = this.Width / 2,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            //
+            // Change ($)
+            //
+            Label lblChangeDollarsTitle = new Label()
+            {
+                Text = "Change ($)",
+                ForeColor = Color.Gray,
+                Font = SystemFont(8, FontStyle.Bold),
+                Margin = new Padding(0),
+                Padding = new Padding(0),
+                Height = 16,
+                Width = this.Width / 2
+            };
+            lblChangeDollars = new Label()
+            {
+                Text = "$-",
+                ForeColor = Color.Goldenrod,
+                Font = SystemFont(10, FontStyle.Bold),
+                Height = 20,
+                Width = this.Width / 2,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            //
+            // Change (%)
+            //
+            Label lblChangePercentTitle = new Label()
+            {
+                Text = "Change (%)",
+                ForeColor = Color.Gray,
+                Font = SystemFont(8, FontStyle.Bold),
+                Margin = new Padding(0),
+                Padding = new Padding(0),
+                Height = 16,
+                Width = this.Width / 2
+            };
+            lblChangePercent = new Label()
+            {
+                Text = "-%",
+                ForeColor = Color.Goldenrod,
+                Font = SystemFont(10, FontStyle.Bold),
+                Height = 20,
+                Width = this.Width / 2,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            pnlChange.Controls.AddRange(new[]
+            {
+                lblOpenTitle, lblPriorClose,
+                lblSpreadTitle, lblSpread,
+                lblChangeDollarsTitle, lblChangeDollars,
+                lblChangePercentTitle, lblChangePercent
+            });
+
+            lblOpenTitle.Location = new Point(0, 0);
+            lblPriorClose.DockTo(lblOpenTitle, ControlEdge.Bottom, 0);
+
+            lblSpreadTitle.DockTo(lblOpenTitle, ControlEdge.Right, 0);
+            lblSpread.DockTo(lblSpreadTitle, ControlEdge.Bottom, 0);
+
+            lblChangeDollarsTitle.DockTo(lblPriorClose, ControlEdge.Bottom, 0);
+            lblChangeDollars.DockTo(lblChangeDollarsTitle, ControlEdge.Bottom, 0);
+
+            lblChangePercentTitle.DockTo(lblSpread, ControlEdge.Bottom, 0);
+            lblChangePercent.DockTo(lblChangePercentTitle, ControlEdge.Bottom, 0);
+
+            this.Controls.Add(pnlChange);
+        }
+
+        [Initializer]
+        private void InitializeDataHandler()
+        {
+            LiveDataProvider.Instance.LiveQuoteReceived += (s, e) =>
+            {
+                if (this.Created)
+                    UpdateQuote(e.security, e.QuoteType, e.QuoteTime, e.QuotePrice, e.QuoteVolume);
+            };
+        }
+
+        public void LoadSecurity(Security security)
+        {
+            if (this.ActiveSecurity == security)
+                return;
+
+            this.ActiveSecurity = security;
+            UpdateSymbolLabel();
+        }
+        private void UpdateSymbolLabel()
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action(() => UpdateSymbolLabel()));
+                return;
+            }
+
+            lblSymbol.Text = ActiveSecurity.Ticker;
+            ClearAllQuotes();
+            Refresh();
+        }
+
+        public void UpdateQuote(Security security, LiveQuoteType quoteType, DateTime quoteTime, decimal quotePrice, long quoteVolume = 0)
+        {
+            if (security != ActiveSecurity)
+                return;
+
+            switch (quoteType)
+            {
+                case LiveQuoteType.NotSet:
+                    break;
+                case LiveQuoteType.Bid:
+                    UpdateBid(quoteTime, quotePrice, quoteVolume);
+                    break;
+                case LiveQuoteType.Ask:
+                    UpdateAsk(quoteTime, quotePrice, quoteVolume);
+                    break;
+                case LiveQuoteType.Open:
+                    this.open = quotePrice;
+                    UpdateStats();
+                    break;
+                case LiveQuoteType.Trade:
+                    this.lastTrade = quotePrice;
+                    UpdateLastTrade(quoteTime, quotePrice, quoteVolume);
+                    UpdateStats();
+                    break;
+                default:
+                    break;
             }
         }
 
-        public BarSize BarSize { get; private set; } = BarSize.Daily;
+        private void ClearAllQuotes()
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action(() => ClearAllQuotes()));
+                return;
+            }
+
+            lblBidPrice.Text = "$-";
+            lblBidVolume.Text = "-";
+            lblBidTime.Text = "-";
+
+            lblLastTradePrice.Text = "$-";
+            lblLastTradeVolume.Text = "-";
+            lblLastTradeTime.Text = "-";
+
+            lblAskPrice.Text = "$-";
+            lblAskVolume.Text = "-";
+            lblAskTime.Text = "-";
+
+            lblPriorClose.Text = "$-";
+            lblSpread.Text = "$-";
+            lblChangeDollars.Text = "$-";
+            lblChangePercent.Text = "-%";
+
+            lblChangeDollars.ForeColor = Color.Goldenrod;
+            lblChangePercent.ForeColor = Color.Goldenrod;
+        }
+
+        private void UpdateBid(DateTime quoteTime, decimal quotePrice, long quoteVolume)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action(() => UpdateBid(quoteTime, quotePrice, quoteVolume)));
+                return;
+            }
+
+            lastBid = quotePrice;
+
+            lblBidPrice.Text = $"{quotePrice:$0.000}";
+            lblBidVolume.Text = $"{quoteVolume:0}";
+            lblBidTime.Text = $"{quoteTime:MM/dd/yy hh:mm:ss}";
+        }
+        private void UpdateAsk(DateTime quoteTime, decimal quotePrice, long quoteVolume)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action(() => UpdateAsk(quoteTime, quotePrice, quoteVolume)));
+                return;
+            }
+
+            lastAsk = quotePrice;
+
+            lblAskPrice.Text = $"{quotePrice:$0.000}";
+            lblAskVolume.Text = $"{quoteVolume:0}";
+            lblAskTime.Text = $"{quoteTime:MM/dd/yy hh:mm:ss}";
+        }
+        private void UpdateLastTrade(DateTime tradeTime, decimal tradePrice, long tradeSize)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action(() => UpdateLastTrade(tradeTime, tradePrice, tradeSize)));
+                return;
+            }
+
+            lblLastTradePrice.Text = $"{tradePrice:$0.000}";
+            lblLastTradeVolume.Text = $"{tradeSize:0}";
+            lblLastTradeTime.Text = $"{tradeTime:MM/dd/yy hh:mm:ss}";
+        }
+        private void UpdateStats()
+        {
+            if (open == -1)
+                return;
+
+            if (InvokeRequired)
+            {
+                Invoke(new Action(() => UpdateStats()));
+                return;
+            }
+
+            lblPriorClose.Text = $"{open:$0.00}";
+            lblSpread.Text = (lastAsk != -1 && lastBid != -1) ? $"{lastAsk - lastBid:$0.00}" : "$-";
+
+            if (lastTrade == -1)
+                return;
+
+            var changeDollars = (lastTrade - open);
+            var changePercent = (lastTrade - open) / open;
+
+            lblChangeDollars.ForeColor = changeDollars < 0 ? Color.PaleVioletRed : Color.LightGreen;
+            lblChangePercent.ForeColor = changeDollars < 0 ? Color.PaleVioletRed : Color.LightGreen;
+
+            lblChangeDollars.Text = $"{changeDollars:$0.00}";
+            lblChangePercent.Text = $"{changePercent:0.00%}";
+        }
+
+    }
+
+    public class LiveIntradayTickChartPanel : Panel
+    {
+        Size _defaultSize = new Size(500, 250);
+        LiveIntradayTickChart Chart { get; set; }
+        public Security ActiveSecurity { get; protected set; }
+
+        public LiveIntradayTickChartPanel()
+        {
+            this.InitializeMe();
+        }
+
+        [Initializer]
+        private void InitializePanel()
+        {
+            this.Size = _defaultSize;
+            this.MinimumSize = this.Size;
+            this.MaximumSize = this.Size;
+
+            Chart = new LiveIntradayTickChart()
+            {
+                Dock = DockStyle.Fill
+            };
+
+            this.Controls.Add(Chart);
+        }
+
+        public void LoadSecurity(Security security)
+        {
+            if (ActiveSecurity == security)
+                return;
+
+            this.ActiveSecurity = security;
+            Chart.LoadSecurity(ActiveSecurity);
+        }
+    }
+    public class LiveIntradayTickChart : Chart
+    {
+
+        public Security Security { get; protected set; }
+        private LiveIntradayChartArea ChartArea { get; set; }
+        private LiveIntradayTickSeries ChartSeries { get; set; }
+
+        public LiveIntradayTickChart()
+        {
+            this.InitializeMe();
+        }
+
+        [Initializer]
+        private void InitializeStyles()
+        {
+            this.ChartAreas.Clear();
+            ChartArea = new LiveIntradayChartArea();
+            this.ChartAreas.Add(ChartArea);
+        }
+
+        public void LoadSecurity(Security security)
+        {
+            if (this.Security == security)
+                return;
+
+            this.Security = security;
+            this.Series.Clear();
+            ChartSeries = new LiveIntradayTickSeries(security);
+            this.Series.Add(ChartSeries);
+
+            ChartArea.SetYRange(ChartSeries.MinYValue() * .98m, ChartSeries.MaxYValue() * 1.02m);
+
+            InitializeUpdateHandler();
+        }
+
+        protected void InitializeUpdateHandler()
+        {
+            Security.PropertyChanged += (s, e) =>
+            {
+                if (this.Security != s as Security)
+                    return;
+
+                if (e.PropertyName == "IntradayTicks")
+                {
+                    Invoke(new Action(() =>
+                    {
+                        ChartSeries.UpdateSeries();
+                        ChartArea.SetYRange(ChartSeries.MinYValue() * .98m, ChartSeries.MaxYValue() * 1.02m);
+                    }));
+                }
+            };
+        }
+    }
+    public class LiveIntradayChartArea : ChartArea
+    {
+
+        public LiveIntradayChartArea()
+        {
+            this.InitializeMe();
+        }
+
+        [Initializer]
+        private void InitializeStyles()
+        {
+            this.BackColor = Color.Black;
+            this.Name = "primary";
+
+            //
+            // X Axis
+            //
+
+            this.AxisX.Interval = 1;
+            this.AxisX.IntervalType = DateTimeIntervalType.Minutes;
+            this.AxisX.Minimum = new TimeSpan(8, 0, 0).TotalMinutes;
+            this.AxisX.Maximum = new TimeSpan(15, 30, 0).TotalMinutes;
+
+            this.AxisX.MajorGrid.Interval = 30;
+            this.AxisX.MajorGrid.IntervalType = DateTimeIntervalType.Number;
+            this.AxisX.MajorGrid.Enabled = true;
+            this.AxisY.MajorGrid.IntervalOffset = 0;
+            this.AxisX.MajorGrid.LineColor = Color.FromArgb(64, 64, 64, 64);
+
+            this.AxisX.StripLines.Add(new StripLine()
+            {
+                IntervalType = DateTimeIntervalType.Minutes,
+                IntervalOffsetType = DateTimeIntervalType.NotSet,
+                IntervalOffset = new TimeSpan(8, 30, 0).TotalMinutes,
+                StripWidth = 2,
+                StripWidthType = DateTimeIntervalType.Number,
+                BackColor = Color.FromArgb(255, 0, 128, 0)
+            });
+            this.AxisX.StripLines.Add(new StripLine()
+            {
+                IntervalType = DateTimeIntervalType.Minutes,
+                IntervalOffsetType = DateTimeIntervalType.NotSet,
+                IntervalOffset = new TimeSpan(15, 0, 0).TotalMinutes,
+                StripWidth = 2,
+                StripWidthType = DateTimeIntervalType.Number,
+                BackColor = Color.FromArgb(255, 128, 0, 0)
+            });
+
+            //
+            // Y Axis
+            //
+            this.AxisY.Interval = 0.1;
+            this.AxisY.IntervalType = DateTimeIntervalType.Number;
+            this.AxisY.MajorGrid.Enabled = false;
+
+            //
+            // Layout
+            //
+            this.Position.Auto = false;
+            this.Position.X = 0;
+            this.Position.Y = 0;
+            this.Position.Height = 100;
+            this.Position.Width = 100;
+            this.AxisX.IsMarginVisible = false;
+
+            this.InnerPlotPosition.Auto = false;
+            this.InnerPlotPosition.X = 0;
+            this.InnerPlotPosition.Y = 0;
+            this.InnerPlotPosition.Height = 100;
+            this.InnerPlotPosition.Width = 100;
+        }
+
+        public void SetYRange(decimal minY, decimal maxY)
+        {
+            this.AxisY.Minimum = minY.ToDouble();
+            this.AxisY.Maximum = maxY.ToDouble();
+        }
+
+    }
+    public class LiveIntradayTickSeries : FinanceSeries
+    {
 
         public Security Security { get; }
-        private List<PriceBar> priceBars { get; set; }
-        private Dictionary<BarSize, List<DataPoint>> seriesViews { get; }
 
-        public SecuritySeries(Security security)
+        public LiveIntradayTickSeries(Security security)
         {
             Security = security ?? throw new ArgumentNullException(nameof(security));
 
-            seriesViews = new Dictionary<BarSize, List<DataPoint>>();
-
-            this.InitializeMe();
-        }
-        private SecuritySeries() { }
-        public static SecuritySeries Default()
-        {
-            SecuritySeries ret = new SecuritySeries();
-            ret.SetStyles();
-
-            ret.Points.AddXY(DateTime.Today.AddDays(-30).ToOADate(), 0);
-            ret.Points.AddXY(DateTime.Today.ToOADate(), 1);
-
-            return ret;
-        }
-
-        [Initializer]
-        private void SetStyles()
-        {
-            ChartType = SeriesChartType.Candlestick;
-
-            this["PriceUpColor"] = "Green";
-            this["PriceDownColor"] = "Red";
-        }
-        [Initializer]
-        private void BuildSeries()
-        {
-            priceBars = Security.GetPriceBars();
-            priceBars.Sort((x, y) => x.BarDateTime.CompareTo(y.BarDateTime));
-
-            BuildSeries_Daily();
-            BuildSeries_Weekly();
-            BuildSeries_Monthly();
-
-            Points.Clear();
-            seriesViews[BarSize].ForEach(pt => Points.Add(pt));
-        }
-        private void BuildSeries_Daily()
-        {
-            var pts = new List<DataPoint>();
-            foreach (PriceBar bar in priceBars)
-            {
-                var pt = new DataPoint(this)
-                {
-                    XValue = bar.BarDateTime.ToOADate(),
-                    YValues = bar.AsChartingValue(),
-                    IsValueShownAsLabel = false,
-                    Tag = bar,
-                    Color = (bar.Change >= 0 ? Color.Green : Color.Red)
-                };
-                pts.Add(pt);
-            }
-            seriesViews.Add(BarSize.Daily, pts);
-        }
-        private void BuildSeries_Weekly()
-        {
-            var pts = new List<DataPoint>();
-            foreach (PriceBar bar in priceBars.ToWeekly())
-            {
-                var pt = new DataPoint(this)
-                {
-                    XValue = bar.BarDateTime.ToOADate(),
-                    YValues = bar.AsChartingValue(),
-                    IsValueShownAsLabel = false,
-                    Tag = bar,
-                    Color = (bar.Change >= 0 ? Color.Green : Color.Red)
-                };
-                pts.Add(pt);
-            }
-            seriesViews.Add(BarSize.Weekly, pts);
-        }
-        private void BuildSeries_Monthly()
-        {
-            var pts = new List<DataPoint>();
-            foreach (PriceBar bar in priceBars.ToMonthly())
-            {
-                var pt = new DataPoint(this)
-                {
-                    XValue = bar.BarDateTime.ToOADate(),
-                    YValues = bar.AsChartingValue(),
-                    IsValueShownAsLabel = false,
-                    Tag = bar,
-                    Color = (bar.Change >= 0 ? Color.Green : Color.Red)
-                };
-                pts.Add(pt);
-            }
-            seriesViews.Add(BarSize.Monthly, pts);
-        }
-
-        public void SelectSeries(BarSize barSize)
-        {
-            if (barSize == BarSize)
-                return;
-
-            BarSize = barSize;
-            Points.Clear();
-            seriesViews[barSize].ForEach(pt => Points.Add(pt));
-        }
-    }
-
-    #endregion
-    #region Multi Security Chart
-    
-    /*
-     *  This will display multiple Security series
-     */
-
-    public partial class MultiSecurityChart : Chart
-    {
-       
-    }
-
-    #endregion
-    #region Other Charting Elements
-
-    public class PriceBarTooltip : Panel
-    {
-        Size _pnlSize = new Size(100, 100);
-        Label lblDisplayTxt = new Label();
-        public PriceBar PriceBar { get; private set; }
-
-        public PriceBarTooltip()
-        {
             this.InitializeMe();
         }
 
         [Initializer]
-        private void SetStyle()
+        protected override void SetStyles()
         {
-            BackColor = Color.FromArgb(10, 10, 10);
-            BorderStyle = BorderStyle.FixedSingle;
-            Size = _pnlSize;
-            DoubleBuffered = true;
-
-            lblDisplayTxt.Font = Helpers.SystemFont(8);
-            lblDisplayTxt.ForeColor = Color.White;
-            lblDisplayTxt.Size = _pnlSize;
-            Controls.Add(lblDisplayTxt);
+            this.ChartType = SeriesChartType.Line;
+            this.ChartArea = "primary";
+            this.MarkerSize = 8;
         }
 
-        public void Show(PriceBar priceBar)
+        [Initializer]
+        protected override void BuildSeries()
         {
-            PriceBar = priceBar;
+            Points.Clear();
 
-            string displayTxt = string.Format($"{priceBar.BarDateTime.ToShortDateString()}{Environment.NewLine}" +
-                $"OPEN:  {priceBar.Open}{Environment.NewLine}" +
-                $"HIGH:  {priceBar.High}{Environment.NewLine}" +
-                $"LOW:   {priceBar.Low}{Environment.NewLine}" +
-                $"CLOSE: {priceBar.Close}{Environment.NewLine}" +
-                $"CHG:   {priceBar.Change}{Environment.NewLine}" +
-                $"RNG:   {priceBar.Range}");
+            foreach (var tick in Security.IntradayTicks)
+            {
+                var newPt = new DataPoint()
+                {
+                    XValue = tick.time.TotalMinutes,
+                    YValues = new[] { tick.lastTick.ToDouble() }
+                };
+                Points.Add(newPt);
+            }
 
-            lblDisplayTxt.Text = displayTxt;
-
-            Show();
+            if (Points.Count > 0)
+            {
+                Points.Last().IsValueShownAsLabel = true;
+                Points.Last().LabelFormat = "$0.00";
+                Points.Last().LabelForeColor = Color.White;
+            }
         }
 
+        public void UpdateSeries()
+        {
+            foreach (var tick in Security.IntradayTicks)
+            {
+                var pt = Points.SingleOrDefault(x => x.XValue == tick.time.TotalMinutes);
+
+                if (pt != null && pt.YValues[0] == tick.lastTick.ToDouble())
+                    continue;
+                else if (pt != null)
+                    Points.Remove(pt);
+
+                var newPt = new DataPoint()
+                {
+                    XValue = tick.time.TotalMinutes,
+                    YValues = new[] { tick.lastTick.ToDouble() }
+                };
+                Points.Add(newPt);
+            }
+
+            foreach (var pt in Points)
+                pt.IsValueShownAsLabel = false;
+
+            if (Points.Count > 0)
+            {
+                Points.Last().IsValueShownAsLabel = true;
+                Points.Last().LabelFormat = "$0.00";
+                Points.Last().LabelForeColor = Color.White;
+            }
+        }
     }
 
     #endregion

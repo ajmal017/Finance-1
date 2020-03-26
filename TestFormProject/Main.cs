@@ -1,286 +1,150 @@
 ﻿using Finance;
-using Finance.UI;
+using Finance.Data;
+using Finance.LiveTrading;
 using System.Drawing;
 using System.Windows.Forms;
+using System.Collections.Generic;
 using System;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 using static Finance.Logger;
+using static Finance.Helpers;
 
 namespace TestFormProject
 {
-    public partial class Main : Form
+    public partial class Main : Form, IPersistLayout
     {
 
-        Size _formSize = new Size(400, 100);
+        #region Child Forms
 
-        #region Interface Screens
-
-        SecurityManagerUI secManagerUI;
-        SimulationManagerUI simManagerUI;
-        LogOutputUI logOutputUI;
-        SystemClock systemClockUI;
+        LogOutputForm SystemLogForm;
 
         #endregion
 
         #region Form Controls
 
-        MenuStrip menuStrip;
-        ToolStripMenuItem menuData;
-        ToolStripMenuItem menuSimulations;
-        ToolStripMenuItem menuConnect;
-        ToolStripMenuItem menuReconnect;
-        ToolStripMenuItem menuShowDataManager;
-        ToolStripMenuItem menuShowSimulationManager;
-
         #endregion
 
-        public MasterController MasterController { get; private set; } = new MasterController();
+        public bool Sizeable => false;
 
         public Main()
         {
             InitializeComponent();
-
-            // Main form properties
-            Text = "Main";
-            FormBorderStyle = FormBorderStyle.FixedSingle;
-            Size = _formSize;
-
-            // Initialize components
             this.InitializeMe();
-
-            FormClosing += (s, e) =>
-            {
-                if (logOutputUI != null)
-                    logOutputUI.Close();
-            };
         }
 
         #region Initializers
 
         [Initializer]
+        private void InitializeStyles()
+        {
+            Text = "Main";
+            FormBorderStyle = FormBorderStyle.FixedToolWindow;
+            TopMost = true;
+
+            this.Shown += (s, e) => LoadLayout();
+            this.ResizeEnd += (s, e) => SaveLayout();
+            this.FormClosing += (s, e) =>
+            {
+                if (SystemLogForm != null)
+                    SystemLogForm.Close();
+            };
+            bool focusFlag = true;
+            this.GotFocus += (s, e) =>
+            {
+                if (focusFlag)
+                {
+                    foreach (Form form in Application.OpenForms)
+                    {
+                        if (form == this) continue;
+                        form.BringToFront();
+                    }
+                    focusFlag = false;
+                    this.Focus();
+                }
+                else
+                    focusFlag = true;
+            };
+
+        }
+        [Initializer]
+        private void InitializeEventManager()
+        {
+            EventManager.Instance.Initialize();
+        }
+        [Initializer]
         private void InitializeMenuStrip()
         {
 
-            // Menu Strip
-            menuStrip = new MenuStrip() { Name = "menuStrip" };
-            Controls.Add(menuStrip);
+            menuShowSecurityManager.Click += (s, e) => SecurityManagerForm.Instance.Show();
 
-            // Data Menu
-            menuData = new ToolStripMenuItem("Data");
-            menuStrip.Items.Add(menuData);
+            menuShowSimulationManager.Click += (s, e) => SimulationManagerForm.Instance.Show();
 
-            // Simulations Menu
-            menuSimulations = new ToolStripMenuItem("Simulations");
-            menuStrip.Items.Add(menuSimulations);
+            menuShowSettings.Click += (s, e) => SettingsManagerForm.Instance.Show();
 
-            #region Data -> Connect
+            menuShowTradeManager.Click += (s, e) => TradingAccountManagerForm.Instance.Show();
 
-            menuConnect = new ToolStripMenuItem("Connect");
-            menuConnect.Click += (s, e) =>
-            {
-                Log(new LogMessage(Name, "User clicked CONNECT", LogMessageType.Debug));
-
-                if (!MasterController.Initialized)
-                {
-                    MessageBox.Show("Cannot connect: Master Controller not initialized");
-                    return;
-                }
-
-                menuConnect.Enabled = false;
-                new Thread(() => MasterController.ConnectDataProvider()).Start();
-            };
-            MasterController.DataManagerStatusChange += (s, e) =>
-            {
-                try
-                {
-                    if (!e.DataproviderConnected)
-                        Invoke(new Action(() => menuConnect.Enabled = true));
-                    else
-                        Invoke(new Action(() => menuConnect.Enabled = false));
-
-                    Console.WriteLine("test");
-
-                }
-                catch (Exception ex)
-                {
-
-                    throw ex;
-                }
-                Log(new LogMessage(Name, $"Connection Status Changed to {(e.DataproviderConnected ? "CONNECTED" : "DISCONNECTED")}", LogMessageType.Production));
-            };
-            menuData.DropDownItems.Add(menuConnect);
-
-            #endregion
-
-            #region Data -> Reconnect
-
-            menuReconnect = new ToolStripMenuItem("Reconnect")
-            {
-                Enabled = false
-            };
-            menuReconnect.Click += (s, e) =>
-            {
-                Log(new LogMessage(Name, "User clicked RECONNECT", LogMessageType.Debug));
-
-                if (!MasterController.Initialized)
-                {
-                    MessageBox.Show("Cannot connect: Master Controller not initialized");
-                    return;
-                }
-
-                menuReconnect.Enabled = false;
-                MasterController.ReconnectDataProvider();
-            };
-            MasterController.DataManagerStatusChange += (s, e) =>
-            {
-                if (!e.DataproviderConnected)
-                    Invoke(new Action(() => { menuReconnect.Enabled = false; }));
-                else
-                    Invoke(new Action(() => { menuReconnect.Enabled = true; }));
-
-                Log(new LogMessage(Name, $"Connection Status Changed to {(e.DataproviderConnected ? "CONNECTED" : "DISCONNECTED")}", LogMessageType.Production));
-            };
-            menuData.DropDownItems.Add(menuReconnect);
-
-            #endregion
-
-            menuData.DropDownItems.Add(new ToolStripSeparator());
-
-            #region Data -> Security Manager
-
-            menuShowDataManager = new ToolStripMenuItem("Data Manager") { Enabled = false };
-            menuShowDataManager.Click += (s, e) =>
-            {
-                Log(new LogMessage(Name, "User opened Security Manager window", LogMessageType.Debug));
-
-                if (secManagerUI == null || secManagerUI.IsDisposed)
-                    secManagerUI = new SecurityManagerUI(MasterController.DataManager);
-
-                Cursor = Cursors.WaitCursor;
-                secManagerUI.StartPosition = FormStartPosition.Manual;
-                var startPosition = Location;
-                startPosition.Offset(0, Height - 8);
-                secManagerUI.Location = startPosition;
-
-                secManagerUI.Show();
-                Cursor = Cursors.Default;
-            };
-            MasterController.DataManagerStatusChange += (s, e) =>
-            {
-                if (e.DatabaseConnected && e.DataproviderConnected)
-                    Invoke(new Action(() => menuShowDataManager.Enabled = true));
-                else
-                    Invoke(new Action(() => menuShowDataManager.Enabled = false));
-
-                Log(new LogMessage(Name, $"Data Manager Status Changed: Database: {(e.DatabaseConnected ? "YES" : "NO")} " +
-                    $"Provider: {(e.DataproviderConnected ? "YES" : "NO")}", LogMessageType.Production));
-            };
-            menuData.DropDownItems.Add(menuShowDataManager);
-
-            #endregion
-
-            #region Simulations -> Simulation Manager
-
-            menuShowSimulationManager = new ToolStripMenuItem("Simulation Manager") { Enabled = false };
-            MasterController.DataManagerStatusChange += (s, e) =>
-            {
-                //
-                // Disable menu item if the data manager is disconnected
-                //
-
-                if (e.DatabaseConnected && e.DataproviderConnected)
-                    Invoke(new Action(() => menuShowSimulationManager.Enabled = true));
-                else
-                    Invoke(new Action(() =>menuShowSimulationManager.Enabled = false));
-            };
-            menuShowSimulationManager.Click += (s, e) =>
-            {
-                //
-                // Launch the simulation manager
-                //
-
-                Log(new LogMessage(Name, "User opened Simulation Manager window", LogMessageType.Debug));
-
-                if (simManagerUI == null || simManagerUI.IsDisposed)
-                    simManagerUI = new SimulationManagerUI(MasterController.DataManager, MasterController.SimulationManager);
-
-                simManagerUI.Show();
-            };
-            menuSimulations.DropDownItems.Add(menuShowSimulationManager);
-
-            #endregion
         }
-
         [Initializer]
-        private void InitializeStatusDisplay()
+        private void InitializeProviderMonitors()
         {
-            //
-            // Status Display Panel which will contain status indicator controls
-            //
-            pnlStatusDisplay = new Panel
-            {
-                Name = "pnlStatusDisplay",
-                Dock = DockStyle.Fill
-            };
-            pnlStatusDisplay.ControlAdded += (s, e) =>
-            {
-                //
-                // Panel and form will resize as status indicator controls are added
-                //
-                int offset = 0;
-                foreach (Control ctrl in pnlStatusDisplay.Controls)
-                {
-                    ctrl.Height = 30;
-                    ctrl.Location = new Point(0, offset);
-                    ctrl.Width = pnlStatusDisplay.Width;
-                    offset += ctrl.Height;
-                }
-
-                ClientSize = new Size(ClientSize.Width, menuStrip.Height + offset);
-            };
-            Controls.Add(pnlStatusDisplay);
-            pnlStatusDisplay.BringToFront();
-
-            //
-            // Add Status Indicator Controls
-            //
-            pnlStatusDisplay.Controls.Add(MasterController.DataManager.StatusIndicator);
-            pnlStatusDisplay.Controls.Add(MasterController.DataManager.DataProvider.StatusIndicator);
-            pnlStatusDisplay.Controls.Add(MasterController.SimulationManager.StatusIndicator);
-            pnlStatusDisplay.Controls.Add(MasterController.SystemEventStatusIndicator);
+            pnlProviderMonitors.Controls.Add(new ProviderStatusPanel(RefDataManager.Instance));
+            pnlProviderMonitors.Controls.Add(new ProviderStatusPanel(LiveDataProvider.Instance));
+            pnlProviderMonitors.Controls.Add(new ProviderStatusPanel(TradingAccountProvider.Instance));
         }
-
         [Initializer]
         private void InitializeLogger()
         {
-            logOutputUI = new LogOutputUI();
-            logOutputUI.Show();
+            //
+            // Define the message group displayed in this logger
+            //
+            LogMessageType[] msgs = new LogMessageType[]
+            {
+                 LogMessageType.Debug, LogMessageType.Production, LogMessageType.SecurityError, LogMessageType.SystemError
+            };
+            SystemLogForm = new LogOutputForm(msgs.ToList(), "System Log");
+            SystemLogForm.Show();
+        }
+        [Initializer]
+        private void InitializeSystemModeIndicator()
+        {
+            //
+            // Initialize window banner indicting system mode (testing or production)
+            //
+            foreach (Screen screen in Screen.AllScreens)
+                new SystemModeIndicatorForm(screen).Show();
+        }
+        [Initializer]
+        private void InitializeDefaultWindows()
+        {
+            //
+            // World Clock
+            //
+            SystemClock.Instance.Show();
+
+            //
+            // Trading Manager
+            //
+            TradingAccountManagerForm.Instance.Show();
+
+            //
+            // Live Security Quote Screen
+            //
+            LiveQuoteForm.Instance.Show();
         }
 
-        [Initializer]
-        private void InitializeSystemClock()
+        public void SaveLayout()
         {
-            systemClockUI = new SystemClock();
-                        
-            var tz = TimeZoneInfo.GetSystemTimeZones().First(x => x.DisplayName.Contains("Hawaii"));
-            systemClockUI.AddTimeZone(tz);
-
-            tz = TimeZoneInfo.GetSystemTimeZones().First(x => x.DisplayName.Contains("Eastern Time"));
-            systemClockUI.AddTimeZone(tz);
-
-            tz = TimeZoneInfo.GetSystemTimeZones().First(x => x.DisplayName.Contains("Fiji"));
-            systemClockUI.AddTimeZone(tz);
-
-            tz = TimeZoneInfo.GetSystemTimeZones().First(x => x.DisplayName.Contains("Tehran"));
-            systemClockUI.AddTimeZone(tz);
-
-            systemClockUI.Show();
-            systemClockUI.Location = new Point(Screen.PrimaryScreen.WorkingArea.Right - systemClockUI.Width, 0);
+            Settings.Instance.SaveFormLayout(this);
+        }
+        public void LoadLayout()
+        {
+            Settings.Instance.LoadFormLayout(this);
         }
 
         #endregion
-
 
     }
 }

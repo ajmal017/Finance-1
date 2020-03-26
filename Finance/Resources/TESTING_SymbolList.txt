@@ -7,3 +7,28 @@ CARS	Cars.com Inc
 CAT	Caterpillar Inc
 DDS	Dillard's
 DIS	Walt Disney Company
+CRI	Carter's Inc
+CRK	Comstock Resources
+CRL	Charles River Laboratories Intl
+CRM	Salesforce.com Inc
+CRR	Carbo Ceramics
+CRS	Carpenter Technology Corp
+CRT	Cross Timbers Royalty Trust
+CRY	Cryolife
+CS	Credit Suisse Group
+CSL	Carlisle Companies Inc
+CSLT	Castlight Health Inc
+CSS	Css Industries
+HCI	Homeowners Choice
+HCP	HCP Inc
+HCR	Hi-Crush Inc
+NTR	Nutrien Ltd
+NTX	Nuveen Texas Quality
+NTZ	Natuzzi S.P.A.
+NUE	Nucor Corp
+NUM	Nuveen Michigan Quality
+PK	Park Hotels & Resorts Inc
+PKD	Parker Drilling Company
+PKE	Park Electrochemical Corp
+PKG	Packaging Corp of America
+PKI	Perkinelmer

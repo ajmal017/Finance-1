@@ -13,24 +13,6 @@ namespace Finance
     //
 
     /// <summary>
-    /// Apply to financeial to specify return format for output
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Method)]
-    public class StringOutputFormatAttribute : Attribute
-    {
-        string MethodTitle;
-        public StringOutputFormatAttribute(string title)
-        {
-            MethodTitle = (title + ":").PadRight(30) + "{0}";
-        }
-        public string ToString(object value)
-        {
-            decimal val = Convert.ToDecimal(value);
-            return string.Format(MethodTitle, string.Format($"{val.ToString(" $0.00;-$0.00")}").PadLeft(12));
-        }
-    }
-
-    /// <summary>
     /// Apply to methods to identify values which should be displayed by the UI within an object
     /// </summary>
     [AttributeUsage(AttributeTargets.Method)]
@@ -41,17 +23,6 @@ namespace Finance
         public UiDisplayTextAttribute(int order)
         {
             Order = order;
-        }
-    }
-
-    [AttributeUsage(AttributeTargets.Method | AttributeTargets.Property)]
-    public class ChartableResultAttribute : Attribute
-    {
-        public string displayText;
-
-        public ChartableResultAttribute(string displayText)
-        {
-            this.displayText = displayText ?? throw new ArgumentNullException(nameof(displayText));
         }
     }
 
@@ -68,85 +39,10 @@ namespace Finance
         }
     }
 
-    #endregion
-    #region Parameter Related Attributes
 
-    //
-    // Attributes used to tag Parameters which can be modified at runtime
-    //
-
-    /// <summary>
-    /// Generic attribute to identify modifiable properties
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Property)]
-    public abstract class ParameterAttribute : Attribute
+    public class PersistLayoutAttribute : Attribute
     {
-        public string ValueName;
-        public string ValueDescription;
 
-        public abstract string ToStringMinMaxValues();
-    }
-
-    /// <summary>
-    /// Applied to variables which can be changed within a simulation (period, etc)
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Property)]
-    public class TradeSystemParameterDecimalAttribute : ParameterAttribute
-    {
-        public double Minimum;
-        public double Maximum;
-        public double Step;
-
-        public TradeSystemParameterDecimalAttribute(string valueName, string valueDescription, double minimum, double maximum, double step)
-        {
-            ValueName = valueName ?? throw new ArgumentNullException(nameof(valueName));
-            ValueDescription = valueDescription ?? throw new ArgumentNullException(nameof(valueDescription));
-            Minimum = minimum;
-            Maximum = maximum;
-            Step = step;
-        }
-
-        public override string ToStringMinMaxValues()
-        {
-            return string.Format($"Min: {Minimum,5:0.00}{Environment.NewLine}Max: {Maximum,5:0.00}");
-        }
-    }
-
-    [AttributeUsage(AttributeTargets.Property)]
-    public class TradeSystemParameterIntAttribute : ParameterAttribute
-    {
-        public int Minimum;
-        public int Maximum;
-        public int Step;
-
-        public TradeSystemParameterIntAttribute(string valueName, string valueDescription, int minimum, int maximum, int step)
-        {
-            ValueName = valueName ?? throw new ArgumentNullException(nameof(valueName));
-            ValueDescription = valueDescription ?? throw new ArgumentNullException(nameof(valueDescription));
-            Minimum = minimum;
-            Maximum = maximum;
-            Step = step;
-        }
-
-        public override string ToStringMinMaxValues()
-        {
-            return string.Format($"Min: {Minimum,5:#}{Environment.NewLine}Max: {Maximum,5:#}");
-        }
-    }
-
-    [AttributeUsage(AttributeTargets.Property)]
-    public class TradeStrategyFilterAttribute : ParameterAttribute
-    {
-        public TradeStrategyFilterAttribute(string valueName, string valueDescription)
-        {
-            ValueName = valueName ?? throw new ArgumentNullException(nameof(valueName));
-            ValueDescription = valueDescription ?? throw new ArgumentNullException(nameof(valueDescription));
-        }
-
-        public override string ToStringMinMaxValues()
-        {
-            return "NA";
-        }
     }
 
     #endregion
@@ -159,6 +55,109 @@ namespace Finance
     public class InitializerAttribute : Attribute
     {
 
+    }
+
+    #endregion
+    #region Settings Adjustment Attributes
+
+    public class SettingsCategoryAttribute : Attribute
+    {
+        public SettingsType SettingsType { get; }
+        public Type SettingsControlType { get; }
+
+        public SettingsCategoryAttribute(SettingsType settingsType, Type settingsUnderlyingType)
+        {
+            SettingsType = settingsType;
+            SettingsControlType = settingsUnderlyingType;
+        }
+    }
+    public class DisplaySettingConditionAttribute : Attribute
+    {
+
+        public bool Display
+        {
+            get
+            {
+                var val = Settings.Instance.GetType()
+                    .GetProperty(SettingPropertyName)
+                    .GetValue(Settings.Instance);
+                if (val.ToString() == SettingPropertyValue.ToString())
+                    return true;
+                else
+                    return false;
+            }
+        }
+
+        private string SettingPropertyName { get; }
+        private object SettingPropertyValue { get; }
+
+        public DisplaySettingConditionAttribute(string settingPropertyName, object value)
+        {
+            SettingPropertyName = settingPropertyName;
+            SettingPropertyValue = value;
+        }
+    }
+
+    #endregion
+    #region Misc Attributes
+
+    [AttributeUsage(AttributeTargets.Field)]
+    public class FileNameAttribute : Attribute
+    {
+        public string FileName { get; }
+
+        public FileNameAttribute(string filePath)
+        {
+            FileName = filePath ?? throw new ArgumentNullException(nameof(filePath));
+        }
+    }
+    public class IncludeAttribute : Attribute
+    {
+        public bool Include { get; set; }
+
+        public IncludeAttribute(bool include)
+        {
+            Include = include;
+        }
+    }
+    
+    #endregion
+    #region System Event Actions
+
+    [AttributeUsage(AttributeTargets.Method)]
+    public class SystemEventActionAttribute : Attribute
+    {
+        public string DisplayName { get; set; }
+        public TimeSpan ExecutionTime
+        {
+            get
+            {
+                return (TimeSpan)typeof(Settings).GetProperty(ExecutionTimeParameterString).GetValue(Settings.Instance);
+            }
+        }
+        private string ExecutionTimeParameterString { get; }
+
+        /// <param name="executionTimeParameterString">Name of Settings parameter representing the TimeSpan of event execution</param>
+        public SystemEventActionAttribute(string displayName, string executionTimeParameterString)
+        {
+            this.DisplayName = displayName;
+            ExecutionTimeParameterString = executionTimeParameterString ?? throw new ArgumentNullException(nameof(executionTimeParameterString));
+        }
+    }
+
+    #endregion
+    #region Live Trading
+
+    public class AccountValueAttribute : Attribute
+    {
+        public string Description { get; }
+        public string DisplayFormat { get; }
+
+        public AccountValueAttribute(string description, string displayFormat)
+        {
+            Description = description ?? throw new ArgumentNullException(nameof(description));
+            DisplayFormat = displayFormat ?? throw new ArgumentNullException(nameof(displayFormat));
+        }
     }
 
     #endregion

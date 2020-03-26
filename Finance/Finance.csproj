@@ -24,6 +24,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <PlatformTarget>AnyCPU</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -34,6 +35,12 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Common.Logging, Version=3.4.1.0, Culture=neutral, PublicKeyToken=af08829b84f0328e, processorArchitecture=MSIL">
+      <HintPath>..\packages\Common.Logging.3.4.1\lib\net40\Common.Logging.dll</HintPath>
+    </Reference>
+    <Reference Include="Common.Logging.Core, Version=3.4.1.0, Culture=neutral, PublicKeyToken=af08829b84f0328e, processorArchitecture=MSIL">
+      <HintPath>..\packages\Common.Logging.Core.3.4.1\lib\net40\Common.Logging.Core.dll</HintPath>
+    </Reference>
     <Reference Include="CSharpAPI">
       <HintPath>..\..\..\..\..\..\TWS API\samples\CSharp\IBSampleApp\bin\Release\CSharpAPI.dll</HintPath>
     </Reference>
@@ -43,10 +50,23 @@
     <Reference Include="EntityFramework.SqlServer, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089, processorArchitecture=MSIL">
       <HintPath>..\packages\EntityFramework.6.3.0\lib\net45\EntityFramework.SqlServer.dll</HintPath>
     </Reference>
+    <Reference Include="IEXSharp, Version=1.1.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\VSLee.IEXSharp.1.1.0\lib\netstandard2.0\IEXSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="LaunchDarkly.EventSource, Version=3.3.2.0, Culture=neutral, PublicKeyToken=18e8c36453e3060f, processorArchitecture=MSIL">
+      <HintPath>..\packages\LaunchDarkly.EventSource.3.3.2\lib\net45\LaunchDarkly.EventSource.dll</HintPath>
+    </Reference>
+    <Reference Include="Newtonsoft.Json, Version=12.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.12.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.DataAnnotations" />
+    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.ValueTuple, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.ValueTuple.4.5.0\lib\net461\System.ValueTuple.dll</HintPath>
+    </Reference>
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Windows.Forms.DataVisualization" />
     <Reference Include="System.Windows.Forms.DataVisualization.Design" />
@@ -58,69 +78,135 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Database\Database.cs" />
-    <Compile Include="Database\DataManager.cs" />
-    <Compile Include="DataProviders\IbkrDataProvider.cs" />
-    <Compile Include="DataProviders\DataProvider.cs" />
+    <Compile Include="Components\ChartsNew.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Components\DatabaseInfoPanelNew.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Components\SecurityInfoPanelNew.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Components\SecurityTrendInfoPanel.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="DataProviders\LiveData\IbkrLiveDataProvider.cs" />
+    <Compile Include="DataProviders\LiveData\LiveDataProvider.cs" />
+    <Compile Include="DataProviders\ReferenceData\RefDatabase.cs" />
+    <Compile Include="DataProviders\ReferenceData\RefDataManager.cs" />
+    <Compile Include="DataProviders\ReferenceData\IbkrRefDataProvider.cs" />
+    <Compile Include="DataProviders\ReferenceData\RefDataProvider.cs" />
+    <Compile Include="DataProviders\ReferenceData\IexRefDataProvider.cs" />
+    <Compile Include="Environment\Settings.cs" />
+    <Compile Include="Helpers\Analysis.cs" />
     <Compile Include="Helpers\Calendar.cs" />
     <Compile Include="Helpers\CustomAttributes.cs" />
     <Compile Include="Helpers\CustomControls.cs" />
     <Compile Include="Helpers\CustomEvents.cs" />
     <Compile Include="Helpers\CustomExceptions.cs" />
     <Compile Include="Helpers\Enums.cs" />
-    <Compile Include="Environment\IbkrEnvironment.cs" />
     <Compile Include="Environment\IEnvironment.cs" />
     <Compile Include="Helpers\Helpers.cs" />
+    <Compile Include="Components\ProviderStatusPanel.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="LiveTrading\LiveAccountSummaryPanel.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="Helpers\Logger.cs" />
-    <Compile Include="Models\Implementations\TradeStrategies.cs" />
-    <Compile Include="Models\MasterController.cs" />
+    <Compile Include="Helpers\SecurityGroups.cs" />
+    <Compile Include="LiveTrading\PositionsSummaryPanel.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="LiveTrading\LiveQuoteForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="LiveTrading\TradingAccountManagerForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="LiveTrading\LiveTradingEntities.cs" />
+    <Compile Include="DataProviders\TradingData\TradingManager.cs" />
+    <Compile Include="DataProviders\TradingData\TradingProvider.cs" />
+    <Compile Include="Migrations\202003201657087_CustomTags.cs" />
+    <Compile Include="Migrations\202003201657087_CustomTags.designer.cs">
+      <DependentUpon>202003201657087_CustomTags.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Migrations\202003201658497_CustomTags2.cs" />
+    <Compile Include="Migrations\202003201658497_CustomTags2.designer.cs">
+      <DependentUpon>202003201658497_CustomTags2.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Migrations\202003201700065_CustomTags3.cs" />
+    <Compile Include="Migrations\202003201700065_CustomTags3.designer.cs">
+      <DependentUpon>202003201700065_CustomTags3.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Migrations\202003201700392_CustomTags31.cs" />
+    <Compile Include="Migrations\202003201700392_CustomTags31.designer.cs">
+      <DependentUpon>202003201700392_CustomTags31.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Migrations\202003242129421_RemovePriceBarToUpdate.cs" />
+    <Compile Include="Migrations\202003242129421_RemovePriceBarToUpdate.designer.cs">
+      <DependentUpon>202003242129421_RemovePriceBarToUpdate.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Migrations\Configuration.cs" />
+    <Compile Include="Models\IPortfolio.cs" />
+    <Compile Include="Models\Managers\IndexManager.cs" />
+    <Compile Include="Models\TrendIndex.cs" />
+    <Compile Include="Models\PositionManagementStrategies.cs" />
+    <Compile Include="Models\SimulationSettings.cs" />
+    <Compile Include="Models\TradeStrategies.cs" />
+    <Compile Include="Models\Managers\EventManager.cs" />
     <Compile Include="Models\Position.cs" />
     <Compile Include="Models\PriceBar.cs" />
     <Compile Include="Models\Security.cs" />
     <Compile Include="Models\Signal.cs" />
     <Compile Include="Models\Simulation.cs" />
-    <Compile Include="Models\SimulationManager.cs" />
+    <Compile Include="Models\Managers\SimulationManager.cs" />
     <Compile Include="Models\SimulationResults.cs" />
-    <Compile Include="Models\StrategyManager.cs" />
+    <Compile Include="Models\Managers\StrategyManager.cs" />
     <Compile Include="Models\TradeApprovalRules.cs" />
     <Compile Include="Models\Trade.cs" />
-    <Compile Include="Models\TradeManager.cs" />
+    <Compile Include="Models\Managers\TradeManager.cs" />
     <Compile Include="Models\Portfolio.cs" />
-    <Compile Include="Models\PortfolioManager.cs" />
-    <Compile Include="Models\RiskManager.cs" />
-    <Compile Include="Models\TradeStrategyBase.cs" />
+    <Compile Include="Models\Managers\PortfolioManager.cs" />
+    <Compile Include="Models\Managers\RiskManager.cs" />
+    <Compile Include="Models\TrendInfo.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Models\PortfolioSetup.cs" />
-    <Compile Include="UI\Components\PortfolioSimulationResultChart.cs">
-      <SubType>Component</SubType>
-    </Compile>
-    <Compile Include="UI\Components\SingleSecuritySimResultChart.cs">
-      <SubType>Component</SubType>
-    </Compile>
-    <Compile Include="UI\LogOutputUI.cs">
+    <Compile Include="UI\ComponentForms.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="UI\LogOutputUI.Designer.cs">
-      <DependentUpon>LogOutputUI.cs</DependentUpon>
-    </Compile>
-    <Compile Include="UI\SecurityManagerUI.cs">
+    <Compile Include="UI\CustomForm.cs" />
+    <Compile Include="UI\LogOutputForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="UI\SecurityManagerUI.Designer.cs">
-      <DependentUpon>SecurityManagerUI.cs</DependentUpon>
-    </Compile>
-    <Compile Include="UI\SimulationManagerUI.cs">
+    <Compile Include="UI\MarketTrendMonitorForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="UI\SimulationManagerUI.Designer.cs">
-      <DependentUpon>SimulationManagerUI.cs</DependentUpon>
+    <Compile Include="UI\SecurityManagerForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\ViewerForms.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\SettingsManagerForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\SimulationManagerForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\SimulationResultsViewForm.cs">
+      <SubType>Form</SubType>
     </Compile>
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
     <None Include="packages.config" />
+    <None Include="Properties\DataSources\SimulationManager.datasource" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Resources\DowJonesSecurities.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="Resources\NASDAQ_SymbolList.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
@@ -133,19 +219,53 @@
     <Content Include="_Deprecated\_Rules\RulesDescriptions.txt" />
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="Data\" />
     <Folder Include="_Deprecated\_Manager\" />
     <Folder Include="_Deprecated\_Models\" />
     <Folder Include="_Deprecated\_Strategy\" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="UI\LogOutputUI.resx">
-      <DependentUpon>LogOutputUI.cs</DependentUpon>
+    <EmbeddedResource Include="Components\DatabaseInfoPanelNew.resx">
+      <DependentUpon>DatabaseInfoPanelNew.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="UI\SecurityManagerUI.resx">
-      <DependentUpon>SecurityManagerUI.cs</DependentUpon>
+    <EmbeddedResource Include="Components\SecurityInfoPanelNew.resx">
+      <DependentUpon>SecurityInfoPanelNew.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="UI\SimulationManagerUI.resx">
-      <DependentUpon>SimulationManagerUI.cs</DependentUpon>
+    <EmbeddedResource Include="LiveTrading\LiveAccountSummaryPanel.resx">
+      <DependentUpon>LiveAccountSummaryPanel.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="LiveTrading\LiveQuoteForm.resx">
+      <DependentUpon>LiveQuoteForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="LiveTrading\TradingAccountManagerForm.resx">
+      <DependentUpon>TradingAccountManagerForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Migrations\202003201657087_CustomTags.resx">
+      <DependentUpon>202003201657087_CustomTags.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Migrations\202003201658497_CustomTags2.resx">
+      <DependentUpon>202003201658497_CustomTags2.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Migrations\202003201700065_CustomTags3.resx">
+      <DependentUpon>202003201700065_CustomTags3.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Migrations\202003201700392_CustomTags31.resx">
+      <DependentUpon>202003201700392_CustomTags31.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Migrations\202003242129421_RemovePriceBarToUpdate.resx">
+      <DependentUpon>202003242129421_RemovePriceBarToUpdate.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\MarketTrendMonitorForm.resx">
+      <DependentUpon>MarketTrendMonitorForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\SecurityManagerForm.resx">
+      <DependentUpon>SecurityManagerForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\ViewerForms.resx">
+      <DependentUpon>ViewerForms.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\SimulationManagerForm.resx">
+      <DependentUpon>SimulationManagerForm.cs</DependentUpon>
     </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

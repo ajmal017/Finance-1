@@ -245,9 +245,14 @@ namespace Finance
 
         private static List<DateTime> NonStandardClosureDates = new List<DateTime>()
         {
-            new DateTime(2018,12,5), // Former President GW Bush national day of mourning
-            new DateTime(2012,10,29),  // Hurricane Sandy
-            new DateTime(2012,10,30) // Hurricane Sandy
+            new DateTime(2018,12,5),  // Former President GW Bush national day of mourning
+            new DateTime(2012,10,29), // Hurricane Sandy
+            new DateTime(2012,10,30), // Hurricane Sandy
+            new DateTime(2004,06,11), // Former President Reagan national day of mourning
+            new DateTime(2001,09,11), // September 11
+            new DateTime(2001,09,12), // September 11
+            new DateTime(2001,09,13), // September 11
+            new DateTime(2001,09,14)  // September 11
         };
 
         public static bool IsTradingDay(DateTime date)
@@ -304,18 +309,32 @@ namespace Finance
             return (date.DayOfWeek == DayOfWeek.Saturday || date.DayOfWeek == DayOfWeek.Sunday);
         }
 
+        public static int TradingDayCount(DateTime startDate, DateTime endDate)
+        {
+            int count = 0;
+            while (startDate <= endDate)
+            {
+                if (IsTradingDay(startDate))
+                    count += 1;
+                startDate = NextTradingDay(startDate);
+            }
+            return count;
+        }
+
         public static DateTime SettleDate(DateTime tradeDate, SecurityType securityType)
         {
             switch (securityType)
             {
                 case SecurityType.Unknown:
                     return NextTradingDay(tradeDate, 2).Date;
-                case SecurityType.USCommonEquity:
+                case SecurityType.CommonStock:
+                case SecurityType.ETF:
                     return NextTradingDay(tradeDate, 2).Date;
                 default:
-                    throw new Exception();
+                    return NextTradingDay(tradeDate, 2).Date;
             }
         }
+
         public static DateTime NextTradingDay(DateTime date, int Days = 1)
         {
             DateTime ret = date.Date;
@@ -330,14 +349,145 @@ namespace Finance
 
             return ret;
         }
-        public static DateTime PriorTradingDay(DateTime date)
+        /// <summary>
+        /// Returns the first trading day of the week following a given date.  Sunday returns the immediately following Monday
+        /// </summary>
+        /// <param name="date"></param>
+        /// <param name="Weeks"></param>
+        /// <returns></returns>
+        public static DateTime NextTradingWeekStart(DateTime date, int Weeks = 1)
         {
-            DateTime ret = date.AddDays(-1).Date;
-            while (!IsTradingDay(ret))
-                ret = ret.AddDays(-1);
+            DateTime ret = date.Date;
+
+            // Add days to move the date the the next Monday
+            if (ret.DayOfWeek == DayOfWeek.Monday)
+                ret = ret.AddDays(7);
+            else
+                ret = ret.AddDays((8 - ret.DayOfWeek.ToInt()) % 7);
+
+            // Add additional weeks if user specified
+            while (--Weeks > 0)
+                ret = ret.AddDays(7);
+
+            if (!IsTradingDay(ret))
+                ret = NextTradingDay(ret);
 
             return ret;
         }
+        /// <summary>
+        /// Returns the first trading day of the next month
+        /// </summary>
+        /// <param name="date"></param>
+        /// <param name="Weeks"></param>
+        /// <returns></returns>
+        public static DateTime NextTradingMonthStart(DateTime date, int Months = 1)
+        {
+            DateTime ret = date.Date.AddMonths(1);
+            ret = new DateTime(ret.Year, ret.Month, 1);
+
+            while (--Months > 0)
+                ret = ret.AddMonths(1);
+
+            if (!IsTradingDay(ret))
+                ret = NextTradingDay(ret);
+
+            return ret;
+        }
+        /// <summary>
+        /// Returns the first trading day of the next quarter (calendar year)
+        /// </summary>
+        /// <param name="date"></param>
+        /// <param name="Months"></param>
+        /// <returns></returns>
+        public static DateTime NextTradingQuarterStart(DateTime date, int Quarters = 1)
+        {
+            DateTime ret = date.Date;
+            ret = new DateTime(ret.Year, ret.Month, 1);
+
+            int nextMonths = ((12 - ret.Month) % 3) + 1;
+            ret = NextTradingMonthStart(ret, nextMonths);
+
+            while (--Quarters > 0)
+                ret = NextTradingMonthStart(ret, 3);
+
+            return ret;
+        }
+
+        /// <summary>
+        /// Returns the first trading day of the week preceding the week in which the date falls
+        ///  Week is Monday-Sunday
+        /// </summary>
+        /// <param name="date"></param>
+        /// <param name="Weeks"></param>
+        /// <returns></returns>
+        public static DateTime PriorTradingWeekStart(DateTime date, int Weeks = 1)
+        {
+            DateTime ret = date.Date;
+
+            // Add days to move the date the the prior Monday
+            if (ret.DayOfWeek != DayOfWeek.Monday)
+                ret = ret.AddDays(((8 - ret.DayOfWeek.ToInt()) % 7) - 7);
+
+            while (Weeks-- > 0)
+                ret = ret.AddDays(-7);
+
+            if (!IsTradingDay(ret))
+                ret = NextTradingDay(ret);
+
+            return ret;
+        }
+        /// <summary>
+        /// Returns the first trading day of the prior month
+        /// </summary>
+        /// <param name="date"></param>
+        /// <param name="Weeks"></param>
+        /// <returns></returns>
+        public static DateTime PriorTradingMonthStart(DateTime date, int Months = 1)
+        {
+            DateTime ret = new DateTime(date.Year, date.Month, 1);
+
+            while (Months-- > 0)
+                ret = ret.AddMonths(-1);
+
+            if (!IsTradingDay(ret))
+                ret = NextTradingDay(ret);
+
+            return ret;
+        }
+        /// <summary>
+        /// Returns the first trading day of the current quarter (calendar year)
+        /// </summary>
+        /// <param name="date"></param>
+        /// <param name="Months"></param>
+        /// <returns></returns>
+        public static DateTime PriorTradingQuarterStart(DateTime date, int Quarters = 1)
+        {
+            DateTime ret = date.Date;
+            ret = new DateTime(ret.Year, ret.Month, 1);
+
+            int nextMonths = 2 - ((12 - ret.Month) % 3);
+            ret = PriorTradingMonthStart(ret, nextMonths);
+
+            while (Quarters-- > 0)
+                ret = PriorTradingMonthStart(ret, 3);
+
+            return ret;
+        }
+
+        public static DateTime PriorTradingDay(DateTime date, int Days = 1)
+        {
+            DateTime ret = date;
+
+            while (Days-- > 0)
+            {
+                ret = ret.AddDays(-1).Date;
+                while (!IsTradingDay(ret))
+                    ret = ret.AddDays(-1);
+            }
+
+            return ret;
+        }
+
         public static DateTime FirstTradingDayOfMonth(DateTime date)
         {
             date = new DateTime(date.Year, date.Month, 1);
@@ -346,6 +496,25 @@ namespace Finance
 
             return date;
         }
+        public static DateTime FirstTradingDayOfQuarter(DateTime date)
+        {
+            return PriorTradingQuarterStart(date, 0);
+        }
+        public static DateTime FirstTradingDayOfWeek(DateTime date)
+        {
+            DateTime ret = date.Date;
+
+            if (ret.DayOfWeek != DayOfWeek.Monday)
+                ret = ret.AddDays(((8 - ret.DayOfWeek.ToInt()) % 7) - 7);
+            if (!IsTradingDay(ret))
+                ret = NextTradingDay(ret);
+
+            return ret;
+        }
+        public static DateTime LastTradingDayOfWeek(DateTime date)
+        {
+            return PriorTradingDay(NextTradingWeekStart(date));
+        }
 
         public static List<DateTime> AllHolidays(DateTime start, DateTime end)
         {
@@ -353,8 +522,11 @@ namespace Finance
 
             while (start <= end)
             {
-                if (!IsWeekend(start) & !IsTradingDay(start))
+                if (!IsWeekend(start) && !IsTradingDay(start))
                     ret.Add(start);
+                if (NonStandardClosureDates.Contains(start))
+                    ret.Add(start);
+
                 start = start.AddDays(1);
             }
 

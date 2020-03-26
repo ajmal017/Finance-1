@@ -28,10 +28,8 @@ namespace Finance_UnitTests
         [TestMethod]
         public void EmptyPortfolioAccounting()
         {
-
-            IEnvironment testEnvironment = new IbkrEnvironment();
-            PortfolioSetup testSetupParams = new PortfolioSetup(PortfolioDirection.LongShort, PortfolioMarginType.RegTMargin, 10000, true, new DateTime(2019, 11, 18));
-            Portfolio testPortfolio = new Portfolio(testEnvironment, testSetupParams);
+            PortfolioSetup testSetupParams = new PortfolioSetup(PortfolioDirection.LongShort, PortfolioMarginType.RegTMargin, 10000, new DateTime(2019, 11, 18));
+            Portfolio testPortfolio = new Portfolio(testSetupParams);
 
             DateTime AsOf = new DateTime(2019, 11, 18);
             decimal balance = testSetupParams.InitialCashBalance;
@@ -79,9 +77,8 @@ namespace Finance_UnitTests
         [TestMethod]
         public void SimpleTradeTestLong1()
         {
-            IEnvironment testEnvironment = new IbkrEnvironment();
-            PortfolioSetup testSetupParams = new PortfolioSetup(PortfolioDirection.LongShort, PortfolioMarginType.RegTMargin, 10000, true, new DateTime(2019, 11, 18));
-            Portfolio testPortfolio = new Portfolio(testEnvironment, testSetupParams);
+            PortfolioSetup testSetupParams = new PortfolioSetup(PortfolioDirection.LongShort, PortfolioMarginType.RegTMargin, 10000, new DateTime(2019, 11, 18));
+            Portfolio testPortfolio = new Portfolio(testSetupParams);
 
             var testSec = testSecurity1();
             var testTrade = testTradeBuy(testSec);
@@ -119,7 +116,7 @@ namespace Finance_UnitTests
 
             DateTime AsOf = new DateTime(2019, 11, 18);
 
-            decimal commission = testEnvironment.CommissionCharged(testTrade, testSetupParams.APIused);
+            decimal commission = TradingEnvironment.Instance.CommissionCharged(testTrade);
 
 
             Assert.AreEqual(-1.0m, commission);
@@ -167,9 +164,8 @@ namespace Finance_UnitTests
         [TestMethod]
         public void SimpleTradeTestShort1()
         {
-            IEnvironment testEnvironment = new IbkrEnvironment();
-            PortfolioSetup testSetupParams = new PortfolioSetup(PortfolioDirection.LongShort, PortfolioMarginType.RegTMargin, 10000, true, new DateTime(2019, 11, 18));
-            Portfolio testPortfolio = new Portfolio(testEnvironment, testSetupParams);
+            PortfolioSetup testSetupParams = new PortfolioSetup(PortfolioDirection.LongShort, PortfolioMarginType.RegTMargin, 10000, new DateTime(2019, 11, 18));
+            Portfolio testPortfolio = new Portfolio(testSetupParams);
 
             var testSec = testSecurity1();
             var testTrade = testTradeSell(testSec);
@@ -197,7 +193,7 @@ namespace Finance_UnitTests
 
             DateTime AsOf = new DateTime(2019, 11, 18);
 
-            decimal commission = testEnvironment.CommissionCharged(testTrade, testSetupParams.APIused);
+            decimal commission = TradingEnvironment.Instance.CommissionCharged(testTrade);
 
             Assert.AreEqual(-1.0m, commission);
 
@@ -244,9 +240,8 @@ namespace Finance_UnitTests
         [TestMethod]
         public void MultiTradeTest1()
         {
-            IEnvironment testEnvironment = new IbkrEnvironment();
-            PortfolioSetup testSetupParams = new PortfolioSetup(PortfolioDirection.LongShort, PortfolioMarginType.RegTMargin, 10000, true, new DateTime(2019, 11, 18));
-            Portfolio testPortfolio = new Portfolio(testEnvironment, testSetupParams);
+            PortfolioSetup testSetupParams = new PortfolioSetup(PortfolioDirection.LongShort, PortfolioMarginType.RegTMargin, 10000, new DateTime(2019, 11, 18));
+            Portfolio testPortfolio = new Portfolio(testSetupParams);
             var testSec = testSecurity1();
             var testTrade = testTradeBuy(testSec);
             var balance = testSetupParams.InitialCashBalance;
@@ -263,14 +258,14 @@ namespace Finance_UnitTests
             testTrade.MarkExecuted(tradeBar.BarDateTime, executionPrice);
             testPortfolio.AddExecutedTrade(testTrade);
 
-            decimal commission = testEnvironment.CommissionCharged(testTrade, testSetupParams.APIused);
+            decimal commission = TradingEnvironment.Instance.CommissionCharged(testTrade);
 
             // No do a sell of 100 at $1 higher
             testTrade = testTradeSell(testSec);
             testTrade.MarkExecuted(tradeBar.BarDateTime, 11.0m);
             testPortfolio.AddExecutedTrade(testTrade);
 
-            commission += testEnvironment.CommissionCharged(testTrade, testSetupParams.APIused);
+            commission += TradingEnvironment.Instance.CommissionCharged(testTrade);
             // Everything should be zeroed out, less $2 commission
 
             Assert.AreEqual(1, testPortfolio.Positions.Count);
@@ -332,9 +327,8 @@ namespace Finance_UnitTests
         [TestMethod]
         public void MultiTradeTest2()
         {
-            IEnvironment testEnvironment = new IbkrEnvironment();
-            PortfolioSetup testSetupParams = new PortfolioSetup(PortfolioDirection.LongShort, PortfolioMarginType.RegTMargin, 10000, true, new DateTime(2019, 11, 18));
-            Portfolio testPortfolio = new Portfolio(testEnvironment, testSetupParams);
+            PortfolioSetup testSetupParams = new PortfolioSetup(PortfolioDirection.LongShort, PortfolioMarginType.RegTMargin, 10000, new DateTime(2019, 11, 18));
+            Portfolio testPortfolio = new Portfolio(testSetupParams);
             var testSec = testSecurity1();
             var testTrade = testTradeBuy(testSec);
             var balance = testSetupParams.InitialCashBalance;
@@ -352,7 +346,7 @@ namespace Finance_UnitTests
             testTrade.MarkExecuted(tradeBar.BarDateTime, executionPrice);
             testPortfolio.AddExecutedTrade(testTrade);
 
-            decimal commission = testEnvironment.CommissionCharged(testTrade, testSetupParams.APIused);
+            decimal commission = TradingEnvironment.Instance.CommissionCharged(testTrade);
 
             // Execute another 100 shates @ $11.00
             testTrade = testTradeBuy(testSec);
@@ -369,16 +363,15 @@ namespace Finance_UnitTests
             Assert.AreEqual(2000.0m, pos.GrossPositionValue(date, TimeOfDay.MarketEndOfDay));
             Assert.AreEqual(-100.0m, pos.TotalUnrealizedPnL(date, TimeOfDay.MarketEndOfDay));
             Assert.AreEqual(-2100.0m, pos.NetCashImpact(date));
-            Assert.AreEqual(-2.0m, pos.TotalCommissionPaid(testEnvironment, date));
+            Assert.AreEqual(-2.0m, pos.TotalCommissionPaid(date));
 
         }
 
         [TestMethod]
         public void MultiTradeTest3()
         {
-            IEnvironment testEnvironment = new IbkrEnvironment();
-            PortfolioSetup testSetupParams = new PortfolioSetup(PortfolioDirection.LongShort, PortfolioMarginType.RegTMargin, 10000, true, new DateTime(2019, 11, 18));
-            Portfolio testPortfolio = new Portfolio(testEnvironment, testSetupParams);
+            PortfolioSetup testSetupParams = new PortfolioSetup(PortfolioDirection.LongShort, PortfolioMarginType.RegTMargin, 10000, new DateTime(2019, 11, 18));
+            Portfolio testPortfolio = new Portfolio(testSetupParams);
             var testSec = testSecurity1();
             var testTrade = testTradeBuy(testSec);
             var balance = testSetupParams.InitialCashBalance;
@@ -395,7 +388,7 @@ namespace Finance_UnitTests
             testTrade.MarkExecuted(tradeBar.BarDateTime, 10.0m);
             testPortfolio.AddExecutedTrade(testTrade);
 
-            decimal commission = testEnvironment.CommissionCharged(testTrade, testSetupParams.APIused);
+            decimal commission = TradingEnvironment.Instance.CommissionCharged(testTrade);
 
             // Execute another 100 shares @ $11.00
             testTrade = testTradeBuy(testSec);
@@ -443,10 +436,8 @@ namespace Finance_UnitTests
         [TestMethod]
         public void MultiTradeTest4()
         {
-
-            IEnvironment testEnvironment = new IbkrEnvironment();
-            PortfolioSetup testSetupParams = new PortfolioSetup(PortfolioDirection.LongShort, PortfolioMarginType.RegTMargin, 10000, true, new DateTime(2019, 11, 18));
-            Portfolio testPortfolio = new Portfolio(testEnvironment, testSetupParams);
+            PortfolioSetup testSetupParams = new PortfolioSetup(PortfolioDirection.LongShort, PortfolioMarginType.RegTMargin, 10000, new DateTime(2019, 11, 18));
+            Portfolio testPortfolio = new Portfolio(testSetupParams);
             var testSec = testSecurity1();
             var testTrade = testTradeSell(testSec);
             var balance = testSetupParams.InitialCashBalance;
@@ -464,7 +455,7 @@ namespace Finance_UnitTests
             testTrade.MarkExecuted(tradeBar.BarDateTime, 10.0m);
             testPortfolio.AddExecutedTrade(testTrade);
 
-            decimal commission = testEnvironment.CommissionCharged(testTrade, testSetupParams.APIused);
+            decimal commission = TradingEnvironment.Instance.CommissionCharged(testTrade);
 
             // Execute another 100 shares @ $9.00
             testTrade = testTradeSell(testSec);
@@ -513,12 +504,10 @@ namespace Finance_UnitTests
         {
             // Test scenario outlined at IBKR https://www.interactivebrokers.com/en/index.php?f=24862
 
-            IEnvironment testEnvironment = new IbkrEnvironment()
-            {
-                NegateCommissionForTesting = true
-            };
-            PortfolioSetup testSetupParams = new PortfolioSetup(PortfolioDirection.LongShort, PortfolioMarginType.RegTMargin, 10000, true, new DateTime(2019, 11, 18));
-            Portfolio testPortfolio = new Portfolio(testEnvironment, testSetupParams);
+            PortfolioSetup testSetupParams = new PortfolioSetup(PortfolioDirection.LongShort, PortfolioMarginType.RegTMargin, 10000, new DateTime(2019, 11, 18));
+            Portfolio testPortfolio = new Portfolio(testSetupParams);
+
+            TradingEnvironment.Instance.NegateCommissionForTesting = true;
 
             var testSecXYZ = new Security("XYZ", SecurityType.USCommonEquity);
             var testSecABC = new Security("ABC", SecurityType.USCommonEquity);
@@ -729,8 +718,7 @@ namespace Finance_UnitTests
             Assert.AreEqual(-125.0m, copyPort.AvailableFunds(day[5], TimeOfDay.MarketOpen));
 
             // Test rule implementation
-            var rule = new TradeApprovalRule_2();
-
+            var rule = new TradeApprovalRule_2("Rule2");
             Assert.IsFalse(rule.Run(trade3, testPortfolio, day[5], TimeOfDay.MarketOpen));
 
 
@@ -797,15 +785,14 @@ namespace Finance_UnitTests
             Assert.AreEqual(-625.0m, testPortfolio.AvailableFunds(day[5], TimeOfDay.MarketEndOfDay));
             Assert.AreEqual(-625.0m, testPortfolio.ExcessLiquidity(day[5], TimeOfDay.MarketEndOfDay));
 
+            TradingEnvironment.Instance.NegateCommissionForTesting = false;
         }
 
         [TestMethod]
         public void WhatIfTest1()
         {
-
-            IEnvironment testEnvironment = new IbkrEnvironment();
-            PortfolioSetup testSetupParams = new PortfolioSetup(PortfolioDirection.LongShort, PortfolioMarginType.RegTMargin, 10000, true, new DateTime(2019, 11, 18));
-            Portfolio testPortfolio = new Portfolio(testEnvironment, testSetupParams);
+            PortfolioSetup testSetupParams = new PortfolioSetup(PortfolioDirection.LongShort, PortfolioMarginType.RegTMargin, 10000, new DateTime(2019, 11, 18));
+            Portfolio testPortfolio = new Portfolio(testSetupParams);
             var testSec = testSecurity1();
 
             var testTrade1 = testTradeBuy(testSec);

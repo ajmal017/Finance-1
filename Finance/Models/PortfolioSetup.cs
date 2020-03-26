@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -11,22 +12,24 @@ namespace Finance
     /// </summary>
     public class PortfolioSetup
     {
+        [SettingsCategory(SettingsType.PortfolioParameters, typeof(PortfolioDirection))]
+        [SettingsDescription("Portfolio Allowed Trading")]
+        public PortfolioDirection PortfolioDirection { get; set; }
+        [SettingsCategory(SettingsType.PortfolioParameters, typeof(PortfolioMarginType))]
+        [SettingsDescription("Portfolio margin type")]
+        public PortfolioMarginType PortfolioMarginType { get; set; }
 
-        public PortfolioDirection PortfolioDirection { get; set; } = PortfolioDirection.LongShort;
-        public PortfolioMarginType PortfolioMarginType { get; set; } = PortfolioMarginType.RegTMargin;
-
+        [SettingsCategory(SettingsType.PortfolioParameters, typeof(decimal))]
+        [SettingsDescription("Initial Cash Balance")]
         public decimal InitialCashBalance { get; set; }
-
-        public bool APIused { get; set; } = true;
 
         public DateTime InceptionDate { get; set; }
 
-        public PortfolioSetup(PortfolioDirection portfolioDirection, PortfolioMarginType portfolioMarginType, decimal initialCashBalance, bool isAPIused, DateTime inceptionDate)
+        public PortfolioSetup(PortfolioDirection portfolioDirection, PortfolioMarginType portfolioMarginType, decimal initialCashBalance, DateTime inceptionDate)
         {
             PortfolioDirection = portfolioDirection;
             PortfolioMarginType = portfolioMarginType;
             InitialCashBalance = initialCashBalance;
-            APIused = isAPIused;
             InceptionDate = inceptionDate;
         }
 
@@ -36,11 +39,11 @@ namespace Finance
         /// <returns></returns>
         public static PortfolioSetup Default()
         {
-            return new PortfolioSetup(PortfolioDirection.LongOnly,
-                   PortfolioMarginType.RegTMargin,
-                   10000.0m,
-                   true,
-                   DateTime.Today);
+            return new PortfolioSetup(
+                Settings.Instance.PortfolioDirection,
+                Settings.Instance.PortfolioMarginType,
+                Settings.Instance.PortfolioStartingBalance,
+                DateTime.Today);
         }
 
         /// <summary>
@@ -49,7 +52,7 @@ namespace Finance
         /// <returns></returns>
         public PortfolioSetup Copy()
         {
-            return new PortfolioSetup(PortfolioDirection, PortfolioMarginType, InitialCashBalance, APIused, InceptionDate);
+            return new PortfolioSetup(PortfolioDirection, PortfolioMarginType, InitialCashBalance, InceptionDate);
         }
     }
 

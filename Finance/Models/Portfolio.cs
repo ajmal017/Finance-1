@@ -10,67 +10,44 @@ using static Finance.Helpers;
 
 namespace Finance
 {
+
     public partial class Portfolio
     {
-        public string Name { get; }
 
-        public IEnvironment Environment { get; }
-        public PortfolioSetup PortfolioSetup { get; }
+        #region Events
 
-        public List<Position> Positions { get; } = new List<Position>();
-
-        public Portfolio(IEnvironment environment, PortfolioSetup portfolioSetup, string name = "Default Portfolio")
+        public event PositionClosedEventHandler PositionClosed;
+        private void OnPositionClosed(Position position, DateTime AsOf)
         {
-            Environment = environment ?? throw new ArgumentNullException(nameof(environment));
-            PortfolioSetup = portfolioSetup ?? throw new ArgumentNullException(nameof(portfolioSetup));
-            Name = name;
-
-            // PriorSmaValues.Add(Calendar.PriorTradingDay(PortfolioSetup.InceptionDate), PortfolioSetup.InitialCashBalance);
+            PositionClosed?.Invoke(this, new PositionDataEventArgs(position, AsOf));
         }
 
+        public event StoplossRequestHandler RequestForNewStop;
+        protected void OnRequestForNewStop(Position position, DateTime AsOf)
+        {
+            RequestForNewStop?.Invoke(this, new PositionDataEventArgs(position, AsOf));
+        }
+
+        #endregion
+
+        public string Name { get; }
+        public PortfolioSetup PortfolioSetup { get; }
+        public List<Position> Positions { get; } = new List<Position>();
+
+        public Portfolio(PortfolioSetup portfolioSetup, string name = "Default Portfolio")
+        {
+            PortfolioSetup = portfolioSetup ?? throw new ArgumentNullException(nameof(portfolioSetup));
+            Name = name;
+        }
         public void SetInceptionDate(DateTime date)
         {
             PriorSmaValues.Clear();
-            //PriorSmaValues.Add(Calendar.PriorTradingDay(date), PortfolioSetup.InitialCashBalance);
         }
 
-    }
-
-    /// <summary>
-    /// Events
-    /// </summary>
-    public partial class Portfolio
-    {
-        public class PositionDataResponseEventArgs : EventArgs
-        {
-            public Position position;
-            public DateTime AsOf;
-            public PositionDataResponseEventArgs(Position position, DateTime AsOf)
-            {
-                this.position = position ?? throw new ArgumentNullException(nameof(position));
-                this.AsOf = AsOf;
-            }
-        }
-
-        // Sends up a request in response to a new position opening to generate an initial stoploss trade
-        public delegate void StoplossRequestHandler(object sender, PositionDataResponseEventArgs e);
-        public event StoplossRequestHandler OnRequestStopForNewPosition;
-        protected void RequestStopForNewPosition(Position position, DateTime AsOf)
-        {
-            OnRequestStopForNewPosition?.Invoke(this, new PositionDataResponseEventArgs(position, AsOf));
-        }
-    }
-
-    /// <summary>
-    /// Position Management
-    /// </summary>
-    public partial class Portfolio
-    {
         public bool HasOpenPosition(Security security, DateTime AsOf)
         {
             return Positions.Any(x => x.Security == security && x.IsOpen(AsOf));
         }
-
         public List<Position> GetPositions(PositionStatus positionStatus, DateTime AsOf)
         {
             switch (positionStatus)
@@ -83,22 +60,18 @@ namespace Finance
                     throw new InvalidDataRequestException() { message = "Invalid position status request" };
             }
         }
-
         public List<Position> GetPositions(DateTime AsOf)
         {
             return Positions.ToList();
         }
-
         public List<Position> GetPositions(Security security)
         {
             return (from pos in Positions where pos.Security == security select pos).ToList();
         }
-
         public Position GetPosition(Security security, DateTime AsOf, bool create = false)
         {
             return Positions.Find(x => x.Security == security && x.IsOpen(AsOf)) ?? (create ? Positions.AddAndReturn(new Position(security)) : null);
         }
-
         public void AddExecutedTrade(Trade trade)
         {
             if (trade.TradeStatus != TradeStatus.Executed)
@@ -109,22 +82,33 @@ namespace Finance
 
             position.AddExecutedTrade(trade);
 
+            switch (PortfolioSetup.PortfolioDirection)
+            {
+                case PortfolioDirection.ShortOnly:
+                    if (position.PositionDirection != PositionDirection.ShortPosition)
+                        throw new InvalidTradeForPositionException() { message = "Cannot execute trade due to portfolio direction constraints" };
+                    break;
+                case PortfolioDirection.LongOnly:
+                    if (position.PositionDirection != PositionDirection.LongPosition)
+                        throw new InvalidTradeForPositionException() { message = "Cannot execute trade due to portfolio direction constraints" };
+                    break;
+            }
+
             // Send up a signal that this is a new position and it needs a stoploss assigned
             if (position.ExecutedTrades.Count == 1)
             {
-                RequestStopForNewPosition(position, trade.TradeDate);
+                OnRequestForNewStop(position, trade.TradeDate);
+            }
+
+            if (!position.IsOpen(trade.TradeDate))
+            {
+                OnPositionClosed(position, trade.TradeDate);
             }
         }
-    }
 
-    /// <summary>
-    /// Copy
-    /// </summary>
-    public partial class Portfolio
-    {
         public Portfolio Copy()
         {
-            var ret = new Portfolio(Environment, PortfolioSetup, string.Format($"{Name} (Copy)"))
+            var ret = new Portfolio(PortfolioSetup, string.Format($"{Name} (Copy)"))
             {
                 PriorSmaValues = new Dictionary<DateTime, decimal>(PriorSmaValues)
             };
@@ -139,12 +123,18 @@ namespace Finance
     /// </summary>
     public partial class Portfolio
     {
+
+        public decimal OpenPositions(DateTime AsOf)
+        {
+            return Convert.ToDecimal(GetPositions(PositionStatus.Open, AsOf).Count);
+        }
+
         /// <summary>
         /// 
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [StringOutputFormat("Total Cash")]
+        [AccountValue("Total Cash", "$#,##0.00")]
         public decimal TotalCashValue(DateTime AsOf)
         {
             // Starting Cash + (Purchases + Proceeds) + Commissions (as a negative number)
@@ -156,7 +146,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [StringOutputFormat("Total Purchases & Proceeds")]
+        [AccountValue("Total Purchases & Proceeds", "$#,##0.00")]
         public decimal TotalCashPurchasesAndProceeds(DateTime AsOf)
         {
             return Positions.Sum(x => x.NetCashImpact(AsOf));
@@ -167,10 +157,10 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [StringOutputFormat("Total Commission Paid")]
+        [AccountValue("Total Commission Paid", "$#,##0.00")]
         public decimal TotalCommissions(DateTime AsOf)
         {
-            return Positions.Sum(x => Environment.CommissionCharged(x.ExecutedTrades));
+            return Positions.Sum(x => TradingEnvironment.Instance.CommissionCharged(x.ExecutedTrades));
         }
 
         /// <summary>
@@ -188,7 +178,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [StringOutputFormat("Securities Market Value")]
+        [AccountValue("Securities Market Value", "$#,##0.00")]
         public decimal SecuritiesMarketValue(DateTime AsOf, TimeOfDay MarketValues)
         {
             return StockValue(AsOf, MarketValues);
@@ -199,7 +189,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [StringOutputFormat("Long Value")]
+        [AccountValue("Long Value", "$#,##0.00")]
         public decimal LongStockValue(DateTime AsOf, TimeOfDay MarketValues)
         {
             return (from p in Positions
@@ -213,7 +203,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [StringOutputFormat("Short Value")]
+        [AccountValue("Short Value", "$#,##0.00")]
         public decimal ShortStockValue(DateTime AsOf, TimeOfDay MarketValues)
         {
             return (from p in Positions
@@ -248,7 +238,7 @@ namespace Finance
             return 0m;
         }
 
-        [StringOutputFormat("Equity With Loan")]
+        [AccountValue("Equity With Loan", "$#,##0.00")]
         public decimal EquityWithLoanValue(DateTime AsOf, TimeOfDay MarketValues)
         {
             return
@@ -264,7 +254,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [StringOutputFormat("Available Funds")]
+        [AccountValue("Available Funds", "$#,##0.00")]
         public decimal AvailableFunds(DateTime AsOf, TimeOfDay MarketValues)
         {
             // Normal formula is ELV-IM, however IBKR counts Initial Margin as all trades, not just the day's. 
@@ -278,7 +268,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [StringOutputFormat("Gross Position Value")]
+        [AccountValue("Gross Position Value", "$#,##0.00")]
         public decimal GrossPositionValue(DateTime AsOf, TimeOfDay MarketValues)
         {
             return
@@ -289,7 +279,7 @@ namespace Finance
                 FundValue(AsOf, MarketValues);
         }
 
-        [StringOutputFormat("Net Liquidation Value")]
+        [AccountValue("Net Liquidation Value", "$#,##0.00")]
         public decimal NetLiquidationValue(DateTime AsOf, TimeOfDay MarketValues)
         {
             return
@@ -311,10 +301,10 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [StringOutputFormat("Broker Initial Margin")]
+        [AccountValue("Broker Initial Margin", "$#,##0.00")]
         public decimal BrokerInitialMarginRequirement(DateTime AsOf, TimeOfDay MarketValues)
         {
-            return Positions.Sum(pos => Environment.BrokerMaintenanceMargin(pos, AsOf, MarketValues));
+            return Positions.Sum(pos => TradingEnvironment.Instance.BrokerMaintenanceMargin(pos, AsOf, MarketValues));
         }
 
         /// <summary>
@@ -322,10 +312,10 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [StringOutputFormat("Broker Maint. Margin")]
+        [AccountValue("Broker Maint. Margin", "$#,##0.00")]
         public decimal BrokerMaintenanceMarginRequirement(DateTime AsOf, TimeOfDay MarketValues)
         {
-            return Positions.Sum(x => x.IsOpen(AsOf) ? Environment.BrokerMaintenanceMargin(x, AsOf, MarketValues) : 0);
+            return Positions.Sum(x => x.IsOpen(AsOf) ? TradingEnvironment.Instance.BrokerMaintenanceMargin(x, AsOf, MarketValues) : 0);
         }
 
         /// <summary>
@@ -333,7 +323,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [StringOutputFormat("Excess Liquidity")]
+        [AccountValue("Excess Liquidity", "$#,##0.00")]
         public decimal ExcessLiquidity(DateTime AsOf, TimeOfDay MarketValues)
         {
             return
@@ -350,10 +340,10 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>        
-        [StringOutputFormat("Reg T Maint. Margin")]
+        [AccountValue("Reg T Maint. Margin", "$#,##0.00")]
         public decimal RegTMaintenanceMarginRequirement(DateTime AsOf, TimeOfDay MarketValues)
         {
-            return Positions.Sum(x => x.IsOpen(AsOf) ? Environment.RegTEndOfDayMargin(x, AsOf, MarketValues) : 0);
+            return Positions.Sum(x => x.IsOpen(AsOf) ? TradingEnvironment.Instance.RegTEndOfDayMargin(x, AsOf, MarketValues) : 0);
         }
 
         /// <summary>
@@ -363,7 +353,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [StringOutputFormat("Reg T Initial Margin")]
+        [AccountValue("Reg T Initial Margin", "$#,##0.00")]
         public decimal RegTInitialMarginRequirement(DateTime AsOf, TimeOfDay MarketValues)
         {
             try
@@ -378,7 +368,7 @@ namespace Finance
                         if (t.TradeDate == AsOf &&
                         t.TradeStatus == TradeStatus.Executed &&
                         (int)t.TradeActionBuySell == (int)p.PositionDirection)
-                            ret += Environment.RegTInitialMargin(t);
+                            ret += TradingEnvironment.Instance.RegTInitialMargin(t);
                     });
                 });
 
@@ -390,7 +380,7 @@ namespace Finance
                         if (t.TradeDate == AsOf &&
                         t.TradeStatus == TradeStatus.Executed &&
                         (int)t.TradeActionBuySell == -(int)p.PositionDirection)
-                            ret -= Environment.RegTInitialMargin(t);
+                            ret -= TradingEnvironment.Instance.RegTInitialMargin(t);
                     });
                 });
 
@@ -411,7 +401,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [StringOutputFormat("End of Day SMA Balance")]
+        [AccountValue("End of Day SMA Balance", "$#,##0.00")]
         public decimal SpecialMemorandumAccountBalance(DateTime AsOf, TimeOfDay MarketValues)
         {
             try
@@ -430,12 +420,13 @@ namespace Finance
 
                 // SMA1
                 // Assume no cash deposits or withdrawals during program
-                // Initial margin is ADDED (subtract a negative) for closing orders (closing open longs/covering shorts), SUBTRACTED for opening orders (opening new longs, selling short)
-                // TODO: do we need to count today's commission charges as a change in cash? Probably            
-                var SMA1 = SpecialMemorandumAccountBalance(PriorTradingDay(AsOf), MarketValues) - RegTInitialMarginRequirement(AsOf, MarketValues);
+                // Initial margin is ADDED (subtract a negative) for closing orders (closing open longs/covering shorts), SUBTRACTED for opening orders (opening new longs, selling short)           
+                var SMA1 = SpecialMemorandumAccountBalance(PriorTradingDay(AsOf), MarketValues)
+                    - RegTInitialMarginRequirement(AsOf, MarketValues);
 
                 // SMA2
-                var SMA2 = EquityWithLoanValue(AsOf, MarketValues) - RegTMaintenanceMarginRequirement(AsOf, MarketValues);
+                var SMA2 = EquityWithLoanValue(AsOf, MarketValues)
+                    - RegTMaintenanceMarginRequirement(AsOf, MarketValues);
 
                 // SMA is the greater of SMA1 and SMA2
                 var SMAfinal = Math.Max(SMA1, SMA2);
@@ -450,16 +441,34 @@ namespace Finance
             }
         }
 
-        [StringOutputFormat("Total Realized PNL")]
+        [AccountValue("Total Realized PNL", "$#,##0.00")]
         public decimal TotalRealizedPNL(DateTime AsOf, TimeOfDay MarketValues)
         {
             return Positions.Sum(x => x.TotalRealizedPnL(AsOf));
         }
 
-        [StringOutputFormat("Total Unrealized PNL")]
+        [AccountValue("Total Unrealized PNL", "$#,##0.00")]
         public decimal TotalUnrealizedPNL(DateTime AsOf, TimeOfDay MarketValues)
         {
             return Positions.Sum(x => x.TotalUnrealizedPnL(AsOf, MarketValues));
+        }
+
+        public decimal GetByAccountingSeriesValue(AccountingSeriesValue value, DateTime AsOf, TimeOfDay MarketValues = TimeOfDay.MarketEndOfDay)
+        {
+            //
+            // Invoke accounting method by name provided in AccountingSeriesValue
+            //
+            var method = typeof(Portfolio).GetMethod(Enum.GetName(typeof(AccountingSeriesValue), value));
+
+            switch (method.GetParameters().Count())
+            {
+                case 1:
+                    return (decimal)method.Invoke(this, new object[] { AsOf });
+                case 2:
+                    return (decimal)method.Invoke(this, new object[] { AsOf, MarketValues });
+                default:
+                    return 0;
+            }
         }
 
     }
@@ -469,46 +478,7 @@ namespace Finance
     /// </summary>
     public partial class Portfolio
     {
-        public List<string> ToStringAllActivity(DateTime AsOf)
-        {
 
-            var ret = new List<string>
-            {
-                // Name of the portfolio followed by a divider
-                string.Format($"\r\n{Name}  activity as of {AsOf.ToShortDateString()}\r\n--------------------")
-            };
-
-            Positions.ForEach(p =>
-            {
-                ret.Add(p.ToString(AsOf));
-                ret.AddRange(p.ToStringTrades(AsOf));
-            });
-
-            return ret;
-        }
-
-        public List<string> ToStringAllAccounting(DateTime AsOf)
-        {
-            var ret = new List<string>
-            {
-                // Name of the portfolio followed by a divider
-                string.Format($"\r\n{Name} balances as of {AsOf.ToShortDateString()}\r\n--------------------")
-            };
-
-            foreach (MethodInfo method in GetType().GetMethods())
-            {
-                var attr = method.GetCustomAttribute(typeof(StringOutputFormatAttribute));
-                if (attr == null)
-                    continue;
-
-                if (method.GetParameters().Count() == 1)
-                    ret.Add(((StringOutputFormatAttribute)attr).ToString(method.Invoke(this, new object[] { AsOf })));
-                if (method.GetParameters().Count() == 2)
-                    ret.Add(((StringOutputFormatAttribute)attr).ToString(method.Invoke(this, new object[] { AsOf, TimeOfDay.MarketEndOfDay })));
-            }
-
-            return ret;
-        }
     }
 
 }

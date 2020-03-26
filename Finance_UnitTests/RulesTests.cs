@@ -11,14 +11,12 @@ namespace Finance_UnitTests
 
         private Portfolio testPortfolio(decimal startingBalance)
         {
-            IEnvironment environment = new IbkrEnvironment();
             PortfolioSetup setup = new PortfolioSetup(PortfolioDirection.LongOnly,
                 PortfolioMarginType.RegTMargin,
                startingBalance,
-                true,
                 new DateTime(2019, 11, 20));
 
-            return new Portfolio(environment, setup);
+            return new Portfolio(setup);
         }
 
         private Security testSecurity(string ticker)
@@ -39,7 +37,7 @@ namespace Finance_UnitTests
 
             var trade = new Trade(testSecurity("ABC"), TradeActionBuySell.Buy, 100, TradeType.Market);
 
-            var rule = new TradeApprovalRule_1();
+            var rule = new TradeApprovalRule_1("Rule1");
 
             // Should be false since we only have $1000 total available funds (need minimum $2000)
             Assert.IsFalse(rule.Run(trade, portfolio, testDate, TimeOfDay.MarketOpen));
@@ -60,7 +58,7 @@ namespace Finance_UnitTests
 
             var trade = new Trade(testSecurity("ABC"), TradeActionBuySell.Buy, 100, TradeType.Market);
 
-            var rule = new TradeApprovalRule_2();
+            var rule = new TradeApprovalRule_2("Rule2");
 
             // Should pass
             Assert.IsTrue(rule.Run(trade, portfolio, testDate, TimeOfDay.MarketOpen));

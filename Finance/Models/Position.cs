@@ -111,9 +111,9 @@ namespace Finance
                 switch (MarketValues)
                 {
                     case TimeOfDay.MarketOpen:
-                        return (Size(AsOf) * Security.GetPriceBar(AsOf, false).Open);
+                        return (Size(AsOf) * Security.GetPriceBarOrLastPrior(AsOf, PriceBarSize.Daily, 1).Open);
                     case TimeOfDay.MarketEndOfDay:
-                        return (Size(AsOf) * Security.GetPriceBar(AsOf, false).Close);
+                        return (Size(AsOf) * Security.GetPriceBarOrLastPrior(AsOf, PriceBarSize.Daily, 1).Close);
                     default:
                         throw new InvalidRequestValueException() { message = "MarketValues unknown value" };
                 }
@@ -131,17 +131,17 @@ namespace Finance
             switch (MarketValues)
             {
                 case TimeOfDay.MarketOpen:
-                    RawPNLperShare = ((Security.GetPriceBar(AsOf, false).Open - AverageCost(AsOf)));
+                    RawPNLperShare = ((Security.GetPriceBar(AsOf, PriceBarSize.Daily, false).Open - AverageCost(AsOf)));
                     break;
                 case TimeOfDay.MarketEndOfDay:
-                    RawPNLperShare = ((Security.GetPriceBar(AsOf, false).Close - AverageCost(AsOf)));
+                    RawPNLperShare = ((Security.GetPriceBar(AsOf, PriceBarSize.Daily, false).Close - AverageCost(AsOf)));
                     break;
                 default:
                     throw new InvalidRequestValueException() { message = "MarketValues unknown value" };
             }
 
             // Correct for long/short
-            return (RawPNLperShare * Size(AsOf) * PositionDirection.ToInt());
+            return (RawPNLperShare * Size(AsOf));
         }
         public decimal TotalRealizedPnL(DateTime AsOf)
         {
@@ -168,7 +168,6 @@ namespace Finance
                 decimal averageCost = 0;
                 decimal realized = 0;
 
-                // TODO: TestMethod for this stuff
                 foreach (var trd in tradeList)
                 {
                     // Buy trades increase position and update average price
@@ -194,28 +193,57 @@ namespace Finance
         }
         public decimal TotalReturnPercentage(DateTime AsOf)
         {
-            // If position is still open, return 0
-            if (IsOpen(AsOf))
-                return 0m;
 
             // Total return is Sum($Opening+$Closing) / Abs($Opening)
 
             var openingTrades = ExecutedTrades.Where(x => x.TradeActionBuySell.ToInt() == PositionDirection.ToInt()).ToList();
             var closingTrades = ExecutedTrades.Where(x => x.TradeActionBuySell.ToInt() != PositionDirection.ToInt()).ToList();
 
-            var openingTotalDollars = openingTrades.Sum(x => x.TotalCashImpact);
-            var closingTotalDollars = closingTrades.Sum(x => x.TotalCashImpact);
+            decimal openingTotalDollars = openingTrades.Sum(x => x.TotalCashImpact);
+            decimal closingTotalDollars;
+
+            if (IsOpen(AsOf))
+            {
+                // Use the current cash value of the position
+                closingTotalDollars = GrossPositionValue(AsOf, TimeOfDay.MarketEndOfDay) + closingTrades.Sum(x => x.TotalCashImpact);
+            }
+            else
+            {
+                closingTotalDollars = closingTrades.Sum(x => x.TotalCashImpact);
+            }
 
             var ret = (openingTotalDollars + closingTotalDollars) / Math.Abs(openingTotalDollars);
-
-
-            var pnl = TotalRealizedPnL(AsOf);
-
             return ret;
+        }
+        public decimal TotalReturnDollars(DateTime AsOf)
+        {
+            // Total return is Sum($Opening+$Closing) / Abs($Opening)
 
+            var openingTrades = ExecutedTrades.Where(x => x.TradeActionBuySell.ToInt() == PositionDirection.ToInt()).ToList();
+            var closingTrades = ExecutedTrades.Where(x => x.TradeActionBuySell.ToInt() != PositionDirection.ToInt()).ToList();
+
+            decimal openingTotalDollars = openingTrades.Sum(x => x.TotalCashImpact);
+            decimal closingTotalDollars;
+
+            if (IsOpen(AsOf))
+            {
+                // Use the current cash value of the position
+                closingTotalDollars = GrossPositionValue(AsOf, TimeOfDay.MarketEndOfDay);
+            }
+            else
+            {
+                closingTotalDollars = closingTrades.Sum(x => x.TotalCashImpact);
+            }
+
+            var ret = (openingTotalDollars + closingTotalDollars);
+            return ret;
         }
         public int DaysHeld(DateTime AsOf)
         {
+            if (IsOpen(AsOf))
+            {
+                return Convert.ToInt32((AsOf - ExecutedTrades.Min(x => x.TradeDate)).TotalDays);
+            }
             if (AsOf > ExecutedTrades.Max(x => x.TradeDate))
             {
                 return Convert.ToInt32((ExecutedTrades.Max(x => x.TradeDate) - ExecutedTrades.Min(x => x.TradeDate)).TotalDays);
@@ -226,9 +254,9 @@ namespace Finance
             }
         }
 
-        public decimal TotalCommissionPaid(IEnvironment environment, DateTime AsOf)
+        public decimal TotalCommissionPaid(DateTime AsOf)
         {
-            return ExecutedTrades.Sum(t => environment.CommissionCharged(t, true));
+            return ExecutedTrades.Sum(t => TradingEnvironment.Instance.CommissionCharged(t, true));
         }
     }
 

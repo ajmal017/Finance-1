@@ -1,13 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.28307.852
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29728.190
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Finance", "Finance\Finance.csproj", "{B5FFFF89-08A5-4188-A857-173DEDD04B22}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Finance_UnitTests", "Finance_UnitTests\Finance_UnitTests.csproj", "{AACF0E3A-CBBA-494A-889C-D816EAA99596}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestFormProject", "TestFormProject\TestFormProject.csproj", "{493E8972-BAEF-430A-BBEA-501F3D82C7AC}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FinancePlatform", "TestFormProject\FinancePlatform.csproj", "{493E8972-BAEF-430A-BBEA-501F3D82C7AC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -19,10 +17,6 @@ Global
 		{B5FFFF89-08A5-4188-A857-173DEDD04B22}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B5FFFF89-08A5-4188-A857-173DEDD04B22}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B5FFFF89-08A5-4188-A857-173DEDD04B22}.Release|Any CPU.Build.0 = Release|Any CPU
-		{AACF0E3A-CBBA-494A-889C-D816EAA99596}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{AACF0E3A-CBBA-494A-889C-D816EAA99596}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{AACF0E3A-CBBA-494A-889C-D816EAA99596}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{AACF0E3A-CBBA-494A-889C-D816EAA99596}.Release|Any CPU.Build.0 = Release|Any CPU
 		{493E8972-BAEF-430A-BBEA-501F3D82C7AC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{493E8972-BAEF-430A-BBEA-501F3D82C7AC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{493E8972-BAEF-430A-BBEA-501F3D82C7AC}.Release|Any CPU.ActiveCfg = Release|Any CPU

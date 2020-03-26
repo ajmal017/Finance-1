@@ -1,19 +1,26 @@
 ﻿using Finance.Data;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using static Finance.Logger;
 
 namespace Finance
 {
-    public partial class Simulation
+    public partial class Simulation : INotifyPropertyChanged
     {
-
         #region Events
 
         public event SimulationStatusEventHandler SimulationStatusChanged;
+        public event PropertyChangedEventHandler PropertyChanged;
+
         private void OnSimulationStatusChanged(Simulation simulation)
         {
             SimulationStatusChanged?.Invoke(this, new SimulationStatusEventArgs(simulation));
+        }
+        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
         #endregion
@@ -24,10 +31,16 @@ namespace Finance
         public PortfolioSetup PortfolioSetup { get; }
         public StrategyManager StrategyManager { get; }
         public RiskManager RiskManager { get; }
-        private IEnvironment Environment { get; }
-        private DataManager DataManager { get; }
 
-        public Tuple<DateTime, DateTime> SimulationTimeSpan { get; private set; }
+        public SimulationSettings Settings { get; private set; }
+
+        public (DateTime start, DateTime end) SimulationTimeSpan
+        {
+            get
+            {
+                return (Settings.SimulationStartDate, Settings.SimulationEndDate);
+            }
+        }
 
         private SimulationStatus _SimulationStatus = SimulationStatus.NotStarted;
         public SimulationStatus SimulationStatus
@@ -37,72 +50,77 @@ namespace Finance
             {
                 _SimulationStatus = value;
                 OnSimulationStatusChanged(this);
+                NotifyPropertyChanged();
             }
         }
 
         public bool Complete { get; private set; } = false;
-        public SimulationResults Results { get; private set; }
-
-        public Simulation(
-            IEnvironment environment,
-            DataManager dataManager,
-            PortfolioSetup portfolioSetup,
-            StrategyManager strategyManager,
-            RiskManager riskManager,
-            string name)
+        public SimulationResults Results
         {
-            Environment = environment ?? throw new ArgumentNullException(nameof(environment));
-            DataManager = dataManager ?? throw new ArgumentNullException(nameof(dataManager));
-            PortfolioSetup = portfolioSetup ?? throw new ArgumentNullException(nameof(portfolioSetup));
-
-            Name = name;
-
-            StrategyManager = strategyManager.Copy();
-            RiskManager = riskManager.Copy();
-
-            PortfolioManager = new PortfolioManager(Environment, PortfolioSetup, DataManager, StrategyManager, RiskManager, Name);
+            get
+            {
+                if (Complete)
+                    return new SimulationResults(PortfolioManager.Portfolio, SimulationTimeSpan);
+                else
+                    return null;
+            }
         }
 
-        public bool Run(DateTime startDate, DateTime endDate)
+        public string SimulationNotes { get; set; } = string.Empty;
+
+        public Simulation(PortfolioSetup portfolioSetup, StrategyManager strategyManager, RiskManager riskManager, string name, SimulationSettings settings = null)
         {
-            Log(new LogMessage(Name, $"Beginning Simulation  '{Name}'", LogMessageType.Production));
+            Name = name;
+            PortfolioSetup = portfolioSetup;
+            StrategyManager = strategyManager;
+            RiskManager = riskManager;
+
+            Settings = settings ?? new SimulationSettings(this);
+            if (settings != null)
+                Settings.Simulation = this;
+
+            PortfolioManager = new PortfolioManager(PortfolioSetup, StrategyManager, RiskManager, Name);
+        }
+
+        public bool Run()
+        {
             SimulationStatus = SimulationStatus.Running;
+            Log(new LogMessage(Name, $"Beginning Simulation  '{Name}'", LogMessageType.Production));
 
             try
             {
-                SimulationTimeSpan = new Tuple<DateTime, DateTime>(startDate, endDate);
-                DateTime currentDate = Calendar.PriorTradingDay(startDate);
-                PortfolioManager.SetStartDate(currentDate);
+                DateTime currentDate = SimulationTimeSpan.start;
+                PortfolioManager.SetStartDate(Calendar.PriorTradingDay(SimulationTimeSpan.start));
 
                 //
                 // Execute simulation loop
                 //
-                while (currentDate < endDate)
+                while (currentDate < SimulationTimeSpan.end)
                 {
                     PortfolioManager.ExecuteNextDay();
                     currentDate = PortfolioManager.CurrentSimulationDate;
                 }
 
                 Complete = true;
-                Results = new SimulationResults(PortfolioManager.Portfolio, SimulationTimeSpan);
                 SimulationStatus = SimulationStatus.Complete;
+
                 return Complete;
             }
             catch (TradingSystemException ex)
             {
-                Log(new LogMessage(Name, ex.message, LogMessageType.Error));
+                Log(new LogMessage(Name, $"{ex.GetType()} {ex.message}", LogMessageType.SystemError));
+                SimulationStatus = SimulationStatus.Error;
                 return false;
             }
         }
         public Simulation Copy(string NewName)
         {
             var ret = new Simulation(
-                Environment,
-                DataManager,
                 PortfolioSetup.Copy(),
                 StrategyManager.Copy(),
                 RiskManager.Copy(),
-                NewName);
+                NewName,
+                this.Settings.Copy());
 
             return ret;
         }
@@ -120,7 +138,7 @@ namespace Finance
         }
         public override int GetHashCode()
         {
-            return 539060726 + EqualityComparer<string>.Default.GetHashCode(Name);
+            return 53900726 + EqualityComparer<string>.Default.GetHashCode(Name);
         }
         public static bool operator ==(Simulation simulation1, Simulation simulation2)
         {
