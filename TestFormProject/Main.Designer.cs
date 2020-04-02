@@ -29,7 +29,6 @@
         private void InitializeComponent()
         {
             this.menuStrip1 = new System.Windows.Forms.MenuStrip();
-            this.dataToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.windowToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menuShowSecurityManager = new System.Windows.Forms.ToolStripMenuItem();
             this.menuShowSimulationManager = new System.Windows.Forms.ToolStripMenuItem();
@@ -38,26 +37,22 @@
             this.menuShowSettings = new System.Windows.Forms.ToolStripMenuItem();
             this.label1 = new System.Windows.Forms.Label();
             this.pnlProviderMonitors = new Finance.ExpandoPanel();
+            this.toolsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.menuCalculator = new System.Windows.Forms.ToolStripMenuItem();
             this.menuStrip1.SuspendLayout();
             this.SuspendLayout();
             // 
             // menuStrip1
             // 
             this.menuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.dataToolStripMenuItem,
             this.windowToolStripMenuItem,
-            this.settingsToolStripMenuItem});
+            this.settingsToolStripMenuItem,
+            this.toolsToolStripMenuItem});
             this.menuStrip1.Location = new System.Drawing.Point(0, 0);
             this.menuStrip1.Name = "menuStrip1";
             this.menuStrip1.Size = new System.Drawing.Size(327, 24);
             this.menuStrip1.TabIndex = 0;
             this.menuStrip1.Text = "menuStrip1";
-            // 
-            // dataToolStripMenuItem
-            // 
-            this.dataToolStripMenuItem.Name = "dataToolStripMenuItem";
-            this.dataToolStripMenuItem.Size = new System.Drawing.Size(43, 20);
-            this.dataToolStripMenuItem.Text = "Data";
             // 
             // windowToolStripMenuItem
             // 
@@ -98,7 +93,7 @@
             // menuShowSettings
             // 
             this.menuShowSettings.Name = "menuShowSettings";
-            this.menuShowSettings.Size = new System.Drawing.Size(148, 22);
+            this.menuShowSettings.Size = new System.Drawing.Size(180, 22);
             this.menuShowSettings.Text = "Show Settings";
             // 
             // label1
@@ -117,6 +112,20 @@
             this.pnlProviderMonitors.Name = "pnlProviderMonitors";
             this.pnlProviderMonitors.Size = new System.Drawing.Size(294, 281);
             this.pnlProviderMonitors.TabIndex = 2;
+            // 
+            // toolsToolStripMenuItem
+            // 
+            this.toolsToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.menuCalculator});
+            this.toolsToolStripMenuItem.Name = "toolsToolStripMenuItem";
+            this.toolsToolStripMenuItem.Size = new System.Drawing.Size(47, 20);
+            this.toolsToolStripMenuItem.Text = "Tools";
+            // 
+            // menuCalculator
+            // 
+            this.menuCalculator.Name = "menuCalculator";
+            this.menuCalculator.Size = new System.Drawing.Size(180, 22);
+            this.menuCalculator.Text = "Calculator";
             // 
             // Main
             // 
@@ -139,7 +148,6 @@
         #endregion
 
         private System.Windows.Forms.MenuStrip menuStrip1;
-        private System.Windows.Forms.ToolStripMenuItem dataToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem windowToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem menuShowSecurityManager;
         private System.Windows.Forms.ToolStripMenuItem menuShowSimulationManager;
@@ -148,6 +156,8 @@
         private System.Windows.Forms.ToolStripMenuItem menuShowSettings;
         private Finance.ExpandoPanel pnlProviderMonitors;
         private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.ToolStripMenuItem toolsToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem menuCalculator;
     }
 }
 

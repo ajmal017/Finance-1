@@ -61,19 +61,19 @@ namespace Finance.Data
         #endregion
         #region Status Indicator
 
-        public string Name => RefDataProvider.Name;
+        public string Name => DataProvider.Name;
 
         private ControlStatus _Status { get; set; } = ControlStatus.Offline;
         public ControlStatus Status
         {
             get
             {
-                if (_Status == ControlStatus.ErrorState || RefDataProvider.Status == ControlStatus.ErrorState)
+                if (_Status == ControlStatus.ErrorState || DataProvider.Status == ControlStatus.ErrorState)
                     return ControlStatus.ErrorState;
-                if (_Status == ControlStatus.Working || RefDataProvider.Status == ControlStatus.Working)
+                if (_Status == ControlStatus.Working || DataProvider.Status == ControlStatus.Working)
                     return ControlStatus.Working;
 
-                return (ControlStatus)Math.Min(_Status.ToInt(), RefDataProvider.Status.ToInt());
+                return (ControlStatus)Math.Min(_Status.ToInt(), DataProvider.Status.ToInt());
             }
             set
             {
@@ -85,7 +85,7 @@ namespace Finance.Data
             }
         }
 
-        public bool Connected => RefDataProvider.Connected;
+        public bool Connected => DataProvider.Connected;
 
         public string StatusMessage
         {
@@ -101,7 +101,7 @@ namespace Finance.Data
                 case ControlStatus.Working:
                     if (_Status == ControlStatus.Working)
                         return "Database working";
-                    if (RefDataProvider.Status == ControlStatus.Working)
+                    if (DataProvider.Status == ControlStatus.Working)
                         return "Provider Working";
                     return "ERR";
                 case ControlStatus.Offline:
@@ -109,7 +109,7 @@ namespace Finance.Data
                 case ControlStatus.ErrorState:
                     if (_Status == ControlStatus.ErrorState)
                         return "Database Error";
-                    if (RefDataProvider.Status == ControlStatus.ErrorState)
+                    if (DataProvider.Status == ControlStatus.ErrorState)
                         return "Provider Error";
                     return "ERR";
                 default:
@@ -119,7 +119,7 @@ namespace Finance.Data
 
         public string StatusMessage2
         {
-            get => RefDataProvider.StatusMessage2;
+            get => DataProvider.StatusMessage2;
             set { }
         }
 
@@ -128,7 +128,7 @@ namespace Finance.Data
             //
             // Connect provider
             //
-            RefDataProvider.Connect();
+            DataProvider.Connect();
 
             //
             // Load Securities from database
@@ -140,7 +140,7 @@ namespace Finance.Data
         private bool _Busy => _Status == ControlStatus.Working;
         public bool Busy
         {
-            get => this._Busy | RefDataProvider.Busy;
+            get => this._Busy | DataProvider.Busy;
             set
             {
                 if (value)
@@ -152,7 +152,7 @@ namespace Finance.Data
 
         #endregion
 
-        private RefDataProvider RefDataProvider
+        private RefDataProvider DataProvider
         {
             get
             {
@@ -175,13 +175,13 @@ namespace Finance.Data
         private List<Security> AllSecuritiesList { get; set; } = new List<Security>();
         private bool ReloadSecuritiesList = true;
 
-        public bool ProviderConnected => RefDataProvider == null ? false : RefDataProvider.Connected;
+        public bool ProviderConnected => DataProvider == null ? false : DataProvider.Connected;
         public bool DatabaseConnected => !(PriceDatabase == null);
 
         public RefDataManager()
         {
             this.InitializeMe();
-            Log(new LogMessage(ToString(), "DataManager initialized", LogMessageType.Production));
+            Log(new LogMessage(ToString(), "Data Manager initialized", LogMessageType.Production));
         }
 
         [Initializer]
@@ -190,6 +190,7 @@ namespace Finance.Data
             if (PriceDatabase.Instance == null)
             {
                 Status = ControlStatus.ErrorState;
+                return;
             }
 
             Status = ControlStatus.Ready;
@@ -211,9 +212,9 @@ namespace Finance.Data
         }
         public void ResetDataProviderConnection(int waitMsReconnect = 1000)
         {
-            RefDataProvider.Disconnect();
+            DataProvider.Disconnect();
             Thread.Sleep(waitMsReconnect);
-            RefDataProvider.Connect();
+            DataProvider.Connect();
         }
 
         #region Database Calls
@@ -246,6 +247,7 @@ namespace Finance.Data
             Busy = false;
             OnSecurityDataChanged(securities);
         }
+
         public void DeleteSecurity(Security security)
         {
             ReloadSecuritiesList = true;
@@ -253,6 +255,7 @@ namespace Finance.Data
 
             OnSecurityDataChanged(security);
         }
+
         public List<string> GetAllTickers()
         {
             return PriceDatabase.AllTickers();
@@ -284,49 +287,7 @@ namespace Finance.Data
 
             OnSecurityListLoaded();
         }
-        public List<Security> GetOutOfDateSecurities()
-        {
-            return GetAllSecurities().Where(x => !x.DataUpToDate).ToList();
-        }
-        public void LoadSymbols(List<string> tickers)
-        {
-            Log(new LogMessage("DataManager", $"Loading {tickers.Count} Symbols", LogMessageType.Debug));
 
-            List<Security> toSave = new List<Security>();
-
-            foreach (var item in tickers)
-            {
-                var sec = toSave.AddAndReturn(GetSecurity(item, true));
-            }
-
-            if (toSave.Count > 0)
-            {
-                Log(new LogMessage("DataManager", $"Saving {toSave.Count} Symbols to DB", LogMessageType.Debug));
-                SetSecurities(toSave);
-                ReloadSecuritiesList = true;
-                GetAllSecurities();
-            }
-        }
-        public void LoadSymbols(Dictionary<string, string> tickersAndNames)
-        {
-            Log(new LogMessage("DataManager", $"Loading {tickersAndNames.Count} Symbols", LogMessageType.Debug));
-
-            List<Security> toSave = new List<Security>();
-
-            foreach (var item in tickersAndNames)
-            {
-                var sec = toSave.AddAndReturn(GetSecurity(item.Key, true));
-                sec.LongName = item.Value;
-            }
-
-            if (toSave.Count > 0)
-            {
-                Log(new LogMessage("DataManager", $"Saving {toSave.Count} Symbols to DB", LogMessageType.Debug));
-                SetSecurities(toSave);
-                ReloadSecuritiesList = true;
-                GetAllSecurities();
-            }
-        }
         public void LoadSymbol(string ticker)
         {
             Log(new LogMessage("DataManager", $"Loading {ticker}", LogMessageType.Debug));
@@ -444,85 +405,22 @@ namespace Finance.Data
 
             return false;
         }
+        private void SetTechnical()
+        {
+            foreach (Security security in AllSecuritiesList)
+            {
+                Candlesticks.SetCandlestickPatterns(security);
+                Technicals.SetTechnicals(security);
+            }
+        }
 
         #endregion
 
         #region Data Provider Calls
 
-        public void UpdateSecurityPriceDataBatch(List<Security> securities, DateTime updateTo, bool forceUpdateAll = false)
+        private void UpdateSecurityPriceDataBatch(List<Security> securities, DateTime updateTo)
         {
-            if (!RefDataProvider.Connected)
-            {
-                Log(new LogMessage(ToString(), "Data Provider Not Connected", LogMessageType.SystemError));
-                return;
-            }
-
-            /*
-             *  Creating all these requests at one time may be leading to memory overflow!!!
-             *  
-             */
-
-            List<RefDataProviderRequest> requests = new List<RefDataProviderRequest>();
-
-            foreach (Security security in securities)
-            {
-                if (security.DataUpToDate)
-                    continue;
-
-                if (forceUpdateAll || security.DailyPriceBarData.Count == 0)
-                {
-                    var c = security.GetPriceBars(PriceBarSize.Daily).Count;
-
-                    requests.Add(RefDataProviderRequest.GetPriceDataRequest(security, DateTime.MinValue, updateTo));
-                }
-                else if (security.DailyPriceBarData.Count > 0)
-                {
-                    requests.Add(RefDataProviderRequest.GetPriceDataRequest(security, updateTo));
-                }
-            }
-
-            Busy = true;
-            new Task(() => RefDataProvider.SubmitBatchRequest(requests)).Start();
-        }
-        public void UpdateSecurityPriceData(Security security, DateTime updateTo, bool forceUpdateAll = false)
-        {
-            if (!RefDataProvider.Connected)
-            {
-                Log(new LogMessage(ToString(), "Data Provider Not Connected", LogMessageType.SystemError));
-                return;
-            }
-
-            RefDataProviderRequest request;
-
-            if (forceUpdateAll || security.DailyPriceBarData.Count == 0)
-            {
-                request = RefDataProviderRequest.GetPriceDataRequest(security, DateTime.MinValue, updateTo);
-                Busy = true;
-                new Task(() => RefDataProvider.SubmitRequest(request)).Start();
-            }
-            else if (security.DailyPriceBarData.Count > 0)
-            {
-                //Log(new LogMessage(ToString(), $"Request update to {security.Ticker} from {security.LastBar().BarDateTime.ToString("yyyyMMdd")} to {updateTo.ToString("yyyyMMdd")}", LogMessageType.Production));
-                request = RefDataProviderRequest.GetPriceDataRequest(security, updateTo);
-                Busy = true;
-                new Task(() => RefDataProvider.SubmitRequest(request)).Start();
-            }
-        }
-        public void UpdateSecurityPriceData(Security security, DateTime startDate, DateTime endDate)
-        {
-            if (!RefDataProvider.Connected)
-            {
-                Log(new LogMessage(ToString(), "Data Provider Not Connected", LogMessageType.SystemError));
-                return;
-            }
-
-            RefDataProviderRequest request = RefDataProviderRequest.GetPriceDataRequest(security, startDate, endDate);
-            Busy = true;
-            new Task(() => RefDataProvider.SubmitRequest(request)).Start();
-        }
-        public void UpdateAllPriceData(DateTime updateTo)
-        {
-            if (!RefDataProvider.Connected)
+            if (!DataProvider.Connected)
             {
                 Log(new LogMessage(ToString(), "Data Provider Not Connected", LogMessageType.SystemError));
                 return;
@@ -530,18 +428,83 @@ namespace Finance.Data
 
             new Task(() =>
             {
-                Log(new LogMessage(ToString(), $"*** Begin update all securities in database to {updateTo.ToString("yyyyMMdd")} ***", LogMessageType.Production));
 
-                UpdateSecurityPriceDataBatch(GetAllSecurities(), updateTo);
+                List<RefDataProviderRequest> requests = new List<RefDataProviderRequest>();
 
-                ReloadSecuritiesList = true;
-                OnSecurityListLoaded();
+                foreach (Security security in securities)
+                {
+                    if (security.DataUpToDate)
+                        continue;
 
+                    if (security.DailyPriceBarData.Count == 0)
+                    {
+                        requests.Add(RefDataProviderRequest.GetPriceDataRequest(security, DateTime.MinValue, updateTo));
+                    }
+                    else if (security.DailyPriceBarData.Count > 0)
+                    {
+                        requests.Add(RefDataProviderRequest.GetPriceDataRequest(security, updateTo));
+                    }
+                }
+
+                Busy = true;
+                DataProvider.SubmitBatchRequest(requests);
             }).Start();
+        }
+        public void UpdateSecurityPriceData(Security security, DateTime updateTo)
+        {
+            if (!DataProvider.Connected)
+            {
+                Log(new LogMessage(ToString(), "Data Provider Not Connected", LogMessageType.SystemError));
+                return;
+            }
+
+            if (security.DailyPriceBarData.Count == 0)
+            {
+                var request = RefDataProviderRequest.GetPriceDataRequest(security, DateTime.MinValue, updateTo);
+
+                Busy = true;
+                new Task(() => DataProvider.SubmitRequest(request)).Start();
+            }
+            else if (security.DailyPriceBarData.Count > 0)
+            {
+                var request = RefDataProviderRequest.GetPriceDataRequest(security, updateTo);
+
+                Busy = true;
+                new Task(() => DataProvider.SubmitRequest(request)).Start();
+            }
+        }
+        public void UpdateSecurityPriceData(Security security, DateTime startDate, DateTime endDate)
+        {
+            if (!DataProvider.Connected)
+            {
+                Log(new LogMessage(ToString(), "Data Provider Not Connected", LogMessageType.SystemError));
+                return;
+            }
+
+            RefDataProviderRequest request = RefDataProviderRequest.GetPriceDataRequest(security, startDate, endDate);
+
+            Busy = true;
+            new Task(() => DataProvider.SubmitRequest(request)).Start();
+        }
+
+        public void UpdateAllPriceData(DateTime updateTo)
+        {
+            if (!DataProvider.Connected)
+            {
+                Log(new LogMessage(ToString(), "Data Provider Not Connected", LogMessageType.SystemError));
+                return;
+            }
+
+            Log(new LogMessage(ToString(), $"*** Begin update all securities in database to {updateTo.ToString("yyyyMMdd")} ***", LogMessageType.Production));
+
+            UpdateSecurityPriceDataBatch(GetAllSecurities(), updateTo);
+
+            //ReloadSecuritiesList = true;
+            //OnSecurityListLoaded();
         }
         public void UpdateAllMissingPriceData()
         {
-            if (!RefDataProvider.Connected)
+            if (!DataProvider.Connected)
             {
                 Log(new LogMessage(ToString(), "Data Provider Not Connected", LogMessageType.SystemError));
                 return;
@@ -574,9 +537,10 @@ namespace Finance.Data
             }).Start();
 
         }
+
         public void RequestContractData(Security security)
         {
-            if (!RefDataProvider.Connected)
+            if (!DataProvider.Connected)
             {
                 Log(new LogMessage(ToString(), "Data Provider Not Connected", LogMessageType.SystemError));
                 return;
@@ -584,11 +548,11 @@ namespace Finance.Data
 
             RefDataProviderRequest request = RefDataProviderRequest.GetContractDataRequest(security);
             Busy = true;
-            new Task(() => RefDataProvider.SubmitRequest(request)).Start(); ;
+            new Task(() => DataProvider.SubmitRequest(request)).Start(); ;
         }
         public void RequestContractDataAll()
         {
-            if (!RefDataProvider.Connected)
+            if (!DataProvider.Connected)
             {
                 Log(new LogMessage(ToString(), "Data Provider Not Connected", LogMessageType.SystemError));
                 return;
@@ -611,9 +575,10 @@ namespace Finance.Data
 
             }).Start();
         }
+
         public void RequestCompanyInfo(Security security)
         {
-            if (!RefDataProvider.Connected)
+            if (!DataProvider.Connected)
             {
                 Log(new LogMessage(ToString(), "Data Provider Not Connected", LogMessageType.SystemError));
                 return;
@@ -621,11 +586,11 @@ namespace Finance.Data
 
             RefDataProviderRequest request = RefDataProviderRequest.GetCompanyInfoRequest(security);
             Busy = true;
-            new Task(() => RefDataProvider.SubmitRequest(request)).Start();
+            new Task(() => DataProvider.SubmitRequest(request)).Start();
         }
         public void RequestCompanyInfoAll()
         {
-            if (!RefDataProvider.Connected)
+            if (!DataProvider.Connected)
             {
                 Log(new LogMessage(ToString(), "Data Provider Not Connected", LogMessageType.SystemError));
                 return;
@@ -648,25 +613,26 @@ namespace Finance.Data
 
             }).Start();
         }
+
         public void RequestProviderSupportedSymbols()
         {
-            if (!RefDataProvider.Connected)
+            if (!DataProvider.Connected)
             {
                 Log(new LogMessage(ToString(), "Data Provider Not Connected", LogMessageType.SystemError));
                 return;
             }
 
-            new Task(() => RefDataProvider.GetProviderSupportedSymbols()).Start();
+            new Task(() => DataProvider.GetProviderSupportedSymbols()).Start();
         }
         public void RequestProviderSectors()
         {
-            if (!RefDataProvider.Connected)
+            if (!DataProvider.Connected)
             {
                 Log(new LogMessage(ToString(), "Data Provider Not Connected", LogMessageType.SystemError));
                 return;
             }
 
-            new Task(() => RefDataProvider.GetProviderSectors()).Start();
+            new Task(() => DataProvider.GetProviderSectors()).Start();
         }
 
         private void DataProviderResponseHandler(object sender, DataProviderResponseEventArgs e)
@@ -680,13 +646,7 @@ namespace Finance.Data
             else
                 InvalidStateRequestHandler(e);
 
-            Busy = RefDataProvider.Busy;
-
-            if (!Busy)
-            {
-                //ReloadSecuritiesList = true;
-                //OnSecurityListLoaded();
-            }
+            Busy = DataProvider.Busy;
         }
         private void ErrorRequestHandler(DataProviderResponseEventArgs e)
         {
@@ -734,7 +694,7 @@ namespace Finance.Data
 
             if (e.Symbols == null)
             {
-                Log(new LogMessage(ToString(), $"Symbol request from {nameof(RefDataProvider.Instance)} returned no values", LogMessageType.Production));
+                Log(new LogMessage(ToString(), $"Symbol request from {nameof(DataProvider.Instance)} returned no values", LogMessageType.Production));
                 return;
             }
 
@@ -778,26 +738,6 @@ namespace Finance.Data
             {
                 Console.WriteLine(item);
             }
-        }
-
-        #endregion
-
-        #region UI Display Methods
-
-        [UiDisplayText(0)]
-        public string NumberOfSecurities()
-        {
-            string title = "Security Count:";
-            return string.Format($"{title,-15} {GetAllSecurities().Count}");
-        }
-
-        [UiDisplayText(1)]
-        public string NumberOutOfDateSecurities()
-        {
-            var count = GetOutOfDateSecurities().Count();
-
-            string title = "Out-of-date:";
-            return string.Format($"{title,-15} {count}");
         }
 
         #endregion

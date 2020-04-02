@@ -163,7 +163,7 @@ namespace Finance.Data
 
     public class IexDataProvider : RefDataProvider
     {
-        public override string Name => "IEX Cloud Data";
+        public override string Name => "IEX Cloud Ref Data";
         private IexClient iexClient;
 
         public IexDataProvider()

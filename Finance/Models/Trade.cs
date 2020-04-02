@@ -69,6 +69,9 @@ namespace Finance
             }
         }
 
+        /// <summary>
+        /// Absolute value
+        /// </summary>
         public int Quantity { get; set; }
         public int DirectionalQuantity => (int)TradeActionBuySell * Quantity;
 

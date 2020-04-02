@@ -35,25 +35,6 @@ namespace Finance
         System.Timers.Timer tmrSystemEventTimer;
         List<SystemEventAction> SystemEvents { get; set; }
 
-        private StatusLabelControlManager SystemEventIndicatorManager { get; } = new StatusLabelControlManager("System");
-        public Control SystemEventStatusIndicator
-        {
-            get
-            {
-                return SystemEventIndicatorManager.IssueControl();
-            }
-        }
-        private void setSystemEventStatusIndicator()
-        {
-            SystemEventAction nextEvent = NextScheduledEvent();
-            if (nextEvent == null)
-            {
-                SystemEventIndicatorManager.SetStatus($"Next System Event: None Scheduled", SystemColors.Control, false);
-            }
-            else
-                SystemEventIndicatorManager.SetStatus($"Next System Event: {nextEvent.EventName} @ {nextEvent.ExecutionTime.ToString(@"hh\:mm\:ss")}", SystemColors.Control, false);
-        }
-
         [Initializer]
         private void InitializeSystemTimer()
         {
@@ -64,7 +45,6 @@ namespace Finance
             tmrSystemEventTimer.Elapsed += (s, e) =>
             {
                 ExecuteSystemEvents(DateTime.Now);
-                setSystemEventStatusIndicator();
             };
 
             tmrSystemEventTimer.Start();

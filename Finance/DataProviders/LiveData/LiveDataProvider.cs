@@ -131,6 +131,7 @@ namespace Finance.Data
         public abstract void Connect();
         public abstract void Disconnect();
 
+        public abstract void RequestSnapshotQuotes(Security security);
         public abstract void RequestStreamingQuotes(Security security);
         public abstract void CancelStreamingQuotes(Security security = null);
     }

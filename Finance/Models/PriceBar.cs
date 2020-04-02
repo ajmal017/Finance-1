@@ -62,7 +62,6 @@ namespace Finance
         [NotMapped]
         public PriceBarSize BarSize { get; set; } = PriceBarSize.Daily;
 
-        
         private bool _ToUpdate { get; set; } = false;
         [NotMapped]
         public bool ToUpdate
@@ -182,23 +181,64 @@ namespace Finance
         }
 
         #endregion
+        #region Technicals
 
         [NotMapped]
-        public decimal Change
+        public CandleStickPattern CandlestickFlags { get; set; }
+        public void SetCandlestickFlag(CandleStickPattern flag, bool isSet)
         {
-            get
+            if (isSet)
             {
-                return (Close - Open);
+                CandlestickFlags |= flag;
+            }
+            else
+            {
+                CandlestickFlags &= ~flag;
             }
         }
+        public bool GetCandlestickFlag(CandleStickPattern flag)
+        {
+            return (CandlestickFlags &= flag) == flag;
+        }
+
         [NotMapped]
-        public decimal Range
+        public Technical TechnicalFlags { get; set; }
+        public void SetTechnicalFlag(Technical flag, bool isSet)
+        {
+            if (isSet)
+            {
+                TechnicalFlags |= flag;
+            }
+            else
+            {
+                TechnicalFlags &= ~flag;
+            }
+        }
+        public bool GetTechnicalFlag(Technical flag)
+        {
+            return (TechnicalFlags &= flag) == flag;
+        }
+
+        [NotMapped]
+        public decimal VolumePercentChangeDoD
         {
             get
             {
-                return (High - Low);
+                if (PriorBar == null || PriorBar.Volume == 0)
+                    return 1;
+                else
+                    return (this.Volume / PriorBar.Volume);
             }
         }
+
+        #endregion
+
+        [NotMapped]
+        public decimal Change => (Close - Open);
+        [NotMapped]
+        public decimal Range => (High - Low);
+        [NotMapped]
+        public decimal PercentChange => (Close - Open) / Open;
 
         public PriceBar()
         {
@@ -289,7 +329,7 @@ namespace Finance
         }
         public List<PriceBar> PriorBars(int Count, bool IncludeThisBar = false)
         {
-            var ret = Security.GetPriceBars(this.BarDateTime, Count, this.BarSize, true);
+            var ret = Security.GetPriceBars(this.BarDateTime, Count + 1, this.BarSize, true);
 
             if (!IncludeThisBar)
                 ret.RemoveAll(x => x.BarDateTime == this.BarDateTime);
@@ -351,7 +391,7 @@ namespace Finance
                 Security.SetSecurityAtrValues(period, this.BarSize);
             }
 
-            return MyAverageTrueRange.atr;            
+            return MyAverageTrueRange.atr;
         }
         [NotMapped]
         public (int period, decimal atr) MyAverageTrueRange = (0, 0);

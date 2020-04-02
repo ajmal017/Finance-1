@@ -49,14 +49,23 @@ namespace Finance
         #region Resource File Paths
 
         private string FolderName_Resources = "Resources";
+        private string FolderName_Sounds = "Sounds";
 
         [ApplicationScopedSetting()]
         public string FilePath_SicCodes
         {
-            get
-            {
-                return Path.Combine(Environment.CurrentDirectory, FolderName_Resources, "SicCodes.txt");
-            }
+            get => Path.Combine(Environment.CurrentDirectory, FolderName_Resources, "SicCodes.txt");
+        }
+
+        [ApplicationScopedSetting()]
+        public string DirectoryPath_Sounds
+        {
+            get => Path.Combine(Environment.CurrentDirectory, FolderName_Resources, FolderName_Sounds);
+        }
+
+        public string SoundFilePath(string soundName)
+        {
+            return Path.Combine(DirectoryPath_Sounds, soundName + ".wav");
         }
 
         #endregion
@@ -533,6 +542,28 @@ namespace Finance
                 Save();
             }
         }
+
+        #endregion
+        #region Live Risk
+
+        [UserScopedSetting()]
+        [SettingsCategory(SettingsType.LiveRisk, typeof(decimal))]
+        [DefaultSettingValue("0.015")]
+        [SettingsDescription("Default Initial Position Risk %")]
+        public decimal DefaultInitialPercentRisk
+        {
+            get
+            {
+                return (decimal)this["DefaultInitialPercentRisk"];
+            }
+            set
+            {
+                this["DefaultInitialPercentRisk"] = (decimal)value;
+                Save();
+            }
+        }
+
+        // Maximum position size (% of equity or buying power)
 
         #endregion
         #region Database Settings

@@ -76,7 +76,7 @@ namespace Finance
         {
             var displayProperties = (from property in typeof(LiveAccount).GetTypeInfo()
                                      .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                                     where property.GetCustomAttribute<AccountValueAttribute>() != null
+                                     where property.GetCustomAttribute<DisplayValueAttribute>() != null
                                      select property);
 
             accountGrid.Rows.Clear();
@@ -97,15 +97,15 @@ namespace Finance
             int i = 0;
             foreach (var property in displayProperties)
             {
-                var p = property.GetCustomAttribute<AccountValueAttribute>();
+                var p = property.GetCustomAttribute<DisplayValueAttribute>();
                 if (p == null)
                     continue;
 
                 accountGrid.Rows.Add();
-                accountGrid.Rows[i].Cells["field"].Value = property.GetCustomAttribute<AccountValueAttribute>().Description;
+                accountGrid.Rows[i].Cells["field"].Value = property.GetCustomAttribute<DisplayValueAttribute>().Description;
                 accountGrid.Rows[i].Cells["field"].Tag = property.Name;
 
-                accountGrid.Rows[i].Cells["value"].Style.Format = property.GetCustomAttribute<AccountValueAttribute>().DisplayFormat;
+                accountGrid.Rows[i].Cells["value"].Style.Format = property.GetCustomAttribute<DisplayValueAttribute>().DisplayFormat;
                 accountGrid.Rows[i].Cells["value"].Style.Alignment = DataGridViewContentAlignment.MiddleRight;
 
                 i += 1;

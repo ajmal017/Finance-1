@@ -81,7 +81,6 @@ namespace Finance
                 this.Hide();
                 e.Cancel = true;
             };
-
         }
 
         private void InitializeComponent()
@@ -294,9 +293,6 @@ namespace Finance
         [Initializer]
         private void InitializeHandlers()
         {
-            //
-            // Reload security list and filter values when the database reloads
-            //
             RefDataManager.Instance.SecurityListLoaded += (s, e) =>
             {
                 if (this.Created)
@@ -308,7 +304,6 @@ namespace Finance
                     }));
                 }
             };
-
             securityListGrid1.SelectedSecurityChanged += (s, e) =>
                 {
                     securityInfoPanelNew1.LoadSecurity(this.SelectedSecurity);

@@ -1,202 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using IBApi;
-using System.ComponentModel;
 using System.Threading;
-using System.Collections.Concurrent;
-using System.Windows.Forms;
-using Finance.Data;
 using static Finance.Helpers;
 using static Finance.Logger;
 
 namespace Finance.LiveTrading
 {
-    public abstract class TradingAccountProvider : IProviderStatus
-    {
-        private static TradingProviderType CurrentProvider = TradingProviderType.NotSet;
-        private static TradingAccountProvider _Instance { get; set; }
-        public static TradingAccountProvider Instance
-        {
-            get
-            {
-                if (_Instance == null || CurrentProvider != Settings.Instance.TradingProvider)
-                {
-                    CurrentProvider = Settings.Instance.TradingProvider;
-                    switch (CurrentProvider)
-                    {
-                        case TradingProviderType.NotSet:
-                            throw new UnknownErrorException() { message = "No trading provider selected" };
-                        case TradingProviderType.InteractiveBrokers:
-                            _Instance = new IbkrTradingAccountProvider(Settings.Instance.IbkrTradingProviderPort, 2);
-                            break;
-                        default:
-                            break;
-                    }
-                }
-                return _Instance;
-            }
-        }
-
-        #region Events
-
-        public event TradingAccountIdListEventHandler TradingAccountIdList;
-        protected void OnTradingAccountList(List<string> accountIds)
-        {
-            TradingAccountIdList?.Invoke(this, new TradingAccountListEventArgs(accountIds));
-        }
-
-        public event ActiveAccountChanged ActiveAccountChanged;
-        protected void OnActiveAccountChanged()
-        {
-            ActiveAccountChanged?.Invoke(this, new AccountUpdateEventArgs(ActiveAccount));
-            RequestAccountUpdate(ActiveAccount);
-        }
-
-        public event AccountUpdateEventHandler AccountInformationUpdate;
-        protected void OnAccountUpdate(LiveAccount account)
-        {
-            AccountInformationUpdate?.Invoke(this, new AccountUpdateEventArgs(account));
-        }
-
-        public event TradeStatusUpdateEventHandler TradeStatusUpdate;
-        protected void OnTradeStatusUpdate(LiveTrade trade)
-        {
-            TradeStatusUpdate?.Invoke(this, new TradeStatusUpdateEventArgs(trade));
-        }
-
-        public event OpenPositionEventHandler OpenPositionsUpdate;
-        protected void OnOpenPositionUpdate(LivePosition position)
-        {
-            OpenPositionsUpdate?.Invoke(this, new OpenPositionEventArgs(position));
-        }
-
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected void OnPropertyChanged(string propertyName)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        #endregion
-
-        #region Status Indicator Control
-
-        private ControlStatus _Status { get; set; } = ControlStatus.Offline;
-        public ControlStatus Status
-        {
-            get => _Status;
-            set
-            {
-                if (_Status != value)
-                {
-                    _Status = value;
-                    OnPropertyChanged("Status");
-                    StatusMessage = Status.Description();
-                }
-            }
-        }
-
-        private string _StatusMessage { get; set; } = "";
-        public string StatusMessage
-        {
-            get
-            {
-                return _StatusMessage;
-            }
-            set
-            {
-                if (_StatusMessage != value)
-                {
-                    _StatusMessage = value;
-                    OnPropertyChanged("StatusMessage");
-                }
-            }
-        }
-
-        private string _StatusMessage2 { get; set; } = "";
-        public string StatusMessage2
-        {
-            get
-            {
-                return _StatusMessage2;
-            }
-            set
-            {
-                if (_StatusMessage2 != value)
-                {
-                    _StatusMessage2 = value;
-                    OnPropertyChanged("StatusMessage");
-                }
-            }
-        }
-
-        #endregion
-
-        private bool _Connected { get; set; } = false;
-        public bool Connected
-        {
-            get
-            {
-                return _Connected;
-            }
-            protected set
-            {
-                if (_Connected != value)
-                {
-                    _Connected = value;
-                    Status = (_Connected ? ControlStatus.Ready : ControlStatus.Offline);
-                    OnPropertyChanged("Connected");
-                }
-            }
-        }
-
-        public abstract string Name { get; }
-
-        public List<LiveAccount> AvailableAccounts { get; } = new List<LiveAccount>();
-
-        private LiveAccount _ActiveAccount { get; set; }
-        public LiveAccount ActiveAccount
-        {
-            get
-            {
-                return _ActiveAccount;
-            }
-            protected set
-            {
-                if (_ActiveAccount == value)
-                    return;
-
-                _ActiveAccount = value;
-                OnActiveAccountChanged();
-            }
-        }
-
-        protected TradingAccountProvider()
-        {
-        }
-
-        public abstract void Connect();
-        public abstract void Disconnect();
-
-        public abstract void RequestAccountUpdate(LiveAccount account);
-        public abstract void RequestAllPositions();
-
-        public void SetActiveAccount(string accountId)
-        {
-            var acct = AvailableAccounts.Find(x => x.AccountId == accountId);
-            if (acct == null)
-            {
-                Log(new LogMessage(ToString(), $"Could not load account {accountId}", LogMessageType.TradingError));
-                return;
-            }
-            ActiveAccount = acct;
-        }
-
-    }
-
-    public class IbkrTradingAccountProvider : TradingAccountProvider, EWrapper
+    public class IbkrLiveTradingProvider : LiveTradingProvider, EWrapper
     {
 
         public override string Name => "IBKR Trading";
@@ -259,7 +71,7 @@ namespace Finance.LiveTrading
 
         #endregion
 
-        public IbkrTradingAccountProvider(int port, int clientId)
+        public IbkrLiveTradingProvider(int port, int clientId)
         {
             Port = port;
             ClientId = clientId;
@@ -304,6 +116,75 @@ namespace Finance.LiveTrading
 
         #region Trade Management
 
+        private List<(int ordId, LiveTrade trade, Order ibkrOrder)> SubmittedTrades = new List<(int ordId, LiveTrade trade, Order ibkrOrder)>();
+        private LiveTrade GetTradeById(int orderId)
+        {
+            return SubmittedTrades.Where(x => x.ordId == orderId).SingleOrDefault().trade;
+        }
+
+        public override void SubmitTrades(LiveTrade trade, LiveTrade stopTrade)
+        {
+            var ordId = NextOrderId;
+
+            Order ibkrOrder = new Order()
+            {
+                OrderId = ordId,
+                Account = ActiveAccount.AccountId,
+                Action = trade.TradeDirection.Description(),
+                TotalQuantity = trade.SubmittedQuantity.ToDouble(),
+                LmtPrice = trade.LimitPrice.ToDouble(),
+                OrderType = trade.TradeType.Description(),
+                Transmit = false
+            };
+
+            if (stopTrade == null)
+            {
+                ibkrOrder.Transmit = true;
+                Log(new LogMessage("TradingProvider", $"Placing Singleton Order: {trade.ToString()}", LogMessageType.TradingNotification));
+
+                // TODO: this maybe needs a different interface
+                trade.TradeId = ordId;
+
+                SubmittedTrades.Add((ordId, trade, ibkrOrder));
+
+                clientSocket.placeOrder(ordId, trade.Security.GetContract(), ibkrOrder);
+                return;
+            }
+
+            //
+            // Stop Order
+            //
+
+            ordId = NextOrderId;
+
+            Order ibkrStopOrder = new Order()
+            {
+                OrderId = ordId,
+                ParentId = ibkrOrder.OrderId,
+                Account = ActiveAccount.AccountId,
+                Action = stopTrade.TradeDirection.Description(),
+                TotalQuantity = stopTrade.SubmittedQuantity.ToDouble(),
+                AuxPrice = stopTrade.LimitPrice.ToDouble(),
+                OrderType = trade.TradeType.Description(),
+                Transmit = true
+            };
+
+            Log(new LogMessage("TradingProvider", $"Placing Paired Order: PRIM: {trade.ToString()} STOP: {stopTrade.ToString()}", LogMessageType.TradingNotification));
+
+            // Submit primary
+            SubmittedTrades.Add((ibkrOrder.OrderId, trade, ibkrOrder));
+            trade.TradeId = ibkrOrder.OrderId;
+            clientSocket.placeOrder(ordId, trade.Security.GetContract(), ibkrOrder);
+
+            // Submit stoploss
+            SubmittedTrades.Add((ordId, stopTrade, ibkrStopOrder));
+            stopTrade.TradeId = ibkrStopOrder.OrderId;
+            clientSocket.placeOrder(ordId, trade.Security.GetContract(), ibkrStopOrder);
+
+            return;
+
+        }
+
         public void SCRAM()
         {
             throw new NotImplementedException();
@@ -339,6 +220,8 @@ namespace Finance.LiveTrading
                     case 366:
                         // Ignore
                         break;
+                    case 321:
+                    // Error validating request
                     default:
                         Log(new LogMessage(ToString(), $"Unhandled TWS Trading System Message ID {errorCode}: {errorMsg}", LogMessageType.TradingError));
                         break;
@@ -422,7 +305,9 @@ namespace Finance.LiveTrading
 
             foreach (string accountNum in accountsList.Split(','))
             {
-                if (AvailableAccounts.Exists(x => x.AccountId != accountNum))
+                if (accountNum == "")
+                    continue;
+                if (AvailableAccounts.Exists(x => x.AccountId == accountNum))
                     continue;
 
                 AvailableAccounts.Add(new IbkrAccount(accountNum));
@@ -447,6 +332,8 @@ namespace Finance.LiveTrading
 
             if (currency == "USD")
                 account.SetAccountValue(key, value);
+
+            OnAccountUpdate(account);
         }
         public void updatePortfolio(Contract contract, double position, double marketPrice, double marketValue, double averageCost, double unrealizedPNL, double realizedPNL, string accountName)
         {
@@ -454,8 +341,11 @@ namespace Finance.LiveTrading
                 return;
 
             var pos = account.UpdatePosition<IbkrPosition>(contract.Symbol, position.ToDecimal(), averageCost.ToDecimal());
+            pos.BrokerReportedUnrlPnl(unrealizedPNL.ToDecimal());
 
-            Log(new LogMessage(ToString(), $"Updated position: {position:0.0} x {contract.Symbol} @ {averageCost:$0.00} in {accountName}", LogMessageType.TradingNotification));
+            Log(new LogMessage(ToString(), $"Updated position: {position:0.0} x {contract.Symbol} @ {averageCost:$0.00} in {accountName}", LogMessageType.TradingSystemMessage));
+
+            OnOpenPositionUpdate(pos);
         }
 
         //
@@ -482,17 +372,36 @@ namespace Finance.LiveTrading
 
         public void orderStatus(int orderId, string status, double filled, double remaining, double avgFillPrice, int permId, int parentId, double lastFillPrice, int clientId, string whyHeld, double mktCapPrice)
         {
-
             Console.WriteLine(GetCurrentMethod());
+
+            var trade = GetTradeById(orderId);
+
+            Log(new LogMessage("ORDER STATUS", $"Order {orderId} ({trade}) STATUS: {status}  FILLED: {filled}/{remaining} at avg prx {avgFillPrice:$0.000}"));
+
+            trade.AverageFillPrice = avgFillPrice.ToDecimal();
+            trade.LastFillPrice = lastFillPrice.ToDecimal();
+            trade.TradeStatus = (LiveTradeStatus)Enum.Parse(typeof(LiveTradeStatus), status);
+
+            OnTradeStatusUpdate(trade);
+
+            //Console.WriteLine($"ID: {orderId} Status:{status} Filled:{filled} Remaining:{remaining} AvgFillPx:{avgFillPrice} permId:{permId} LastFillPx:{lastFillPrice} ClientId:{clientId} WhyHeld:{whyHeld} MktCapPx:{mktCapPrice}");
         }
         public void openOrder(int orderId, Contract contract, Order order, OrderState orderState)
         {
-
             Console.WriteLine(GetCurrentMethod());
+            //Console.WriteLine("*** Order ***");
+            //foreach (var prop in order.GetType().GetProperties())
+            //{
+            //    Console.WriteLine($"{prop.Name} : {prop.GetValue(order)}");
+            //}
+            //Console.WriteLine("*** Order State ***");
+            //foreach (var prop in orderState.GetType().GetProperties())
+            //{
+            //    Console.WriteLine($"{prop.Name} : {prop.GetValue(orderState)}");
+            //}
         }
         public void openOrderEnd()
         {
-
             Console.WriteLine(GetCurrentMethod());
         }
         public void execDetails(int reqId, Contract contract, Execution execution)
@@ -501,13 +410,10 @@ namespace Finance.LiveTrading
         }
         public void execDetailsEnd(int reqId)
         {
-
             Console.WriteLine(GetCurrentMethod()); ;
         }
-
         public void position(string account, Contract contract, double pos, double avgCost)
         {
-
             Console.WriteLine(GetCurrentMethod());
         }
         public void positionEnd()
@@ -522,7 +428,6 @@ namespace Finance.LiveTrading
         {
             Console.WriteLine(GetCurrentMethod());
         }
-
         public void accountUpdateMulti(int requestId, string account, string modelCode, string key, string value, string currency)
         {
             Console.WriteLine(GetCurrentMethod());
@@ -531,7 +436,6 @@ namespace Finance.LiveTrading
         {
             Console.WriteLine(GetCurrentMethod());
         }
-
         public void pnl(int reqId, double dailyPnL, double unrealizedPnL, double realizedPnL)
         {
             Console.WriteLine(GetCurrentMethod());
@@ -540,7 +444,6 @@ namespace Finance.LiveTrading
         {
             Console.WriteLine(GetCurrentMethod());
         }
-
         public void completedOrder(Contract contract, Order order, OrderState orderState)
         {
             Console.WriteLine(GetCurrentMethod());
@@ -549,7 +452,6 @@ namespace Finance.LiveTrading
         {
             Console.WriteLine(GetCurrentMethod());
         }
-
         public void realtimeBar(int reqId, long date, double open, double high, double low, double close, long volume, double WAP, int count)
         {
             Console.WriteLine(GetCurrentMethod());
@@ -577,27 +479,22 @@ namespace Finance.LiveTrading
         {
             Console.WriteLine(GetCurrentMethod());
         }
-
         public void smartComponents(int reqId, Dictionary<int, KeyValuePair<string, char>> theMap)
         {
             Console.WriteLine(GetCurrentMethod());
         }
-
         public void tickReqParams(int tickerId, double minTick, string bboExchange, int snapshotPermissions)
         {
             Console.WriteLine(GetCurrentMethod());
         }
-
         public void newsProviders(NewsProvider[] newsProviders)
         {
             Console.WriteLine(GetCurrentMethod());
         }
-
         public void newsArticle(int requestId, int articleType, string articleText)
         {
             Console.WriteLine(GetCurrentMethod());
         }
-
         public void historicalNews(int requestId, string time, string providerCode, string articleId, string headline)
         {
             Console.WriteLine(GetCurrentMethod());
@@ -833,7 +730,8 @@ namespace Finance.LiveTrading
             Console.WriteLine(GetCurrentMethod());
         }
 
+
+
         #endregion
     }
-
 }

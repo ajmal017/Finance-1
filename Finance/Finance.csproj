@@ -90,18 +90,31 @@
     <Compile Include="Components\SecurityTrendInfoPanel.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Include="Components\SingleStockIndicatorTile.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Components\SingleSecurityIndicatorForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Components\SingleSecurityIndicatorForm.Designer.cs">
+      <DependentUpon>SingleSecurityIndicatorForm.cs</DependentUpon>
+    </Compile>
     <Compile Include="DataProviders\LiveData\IbkrLiveDataProvider.cs" />
+    <Compile Include="DataProviders\LiveData\IexLiveDataProvider.cs" />
     <Compile Include="DataProviders\LiveData\LiveDataProvider.cs" />
     <Compile Include="DataProviders\ReferenceData\RefDatabase.cs" />
     <Compile Include="DataProviders\ReferenceData\RefDataManager.cs" />
     <Compile Include="DataProviders\ReferenceData\IbkrRefDataProvider.cs" />
     <Compile Include="DataProviders\ReferenceData\RefDataProvider.cs" />
     <Compile Include="DataProviders\ReferenceData\IexRefDataProvider.cs" />
+    <Compile Include="DataProviders\TradingData\IbkrLiveTradingProvider.cs" />
     <Compile Include="Environment\Settings.cs" />
     <Compile Include="Helpers\Analysis.cs" />
     <Compile Include="Helpers\Calendar.cs" />
     <Compile Include="Helpers\CustomAttributes.cs" />
-    <Compile Include="Helpers\CustomControls.cs" />
+    <Compile Include="Helpers\CustomControls.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="Helpers\CustomEvents.cs" />
     <Compile Include="Helpers\CustomExceptions.cs" />
     <Compile Include="Helpers\Enums.cs" />
@@ -115,18 +128,29 @@
     </Compile>
     <Compile Include="Helpers\Logger.cs" />
     <Compile Include="Helpers\SecurityGroups.cs" />
+    <Compile Include="LiveTrading\LiveRiskManager.cs" />
+    <Compile Include="LiveTrading\LiveTradeEntryForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="LiveTrading\PositionsSummaryPanel.cs">
       <SubType>Component</SubType>
     </Compile>
     <Compile Include="LiveTrading\LiveQuoteForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="LiveTrading\TradingAccountManagerForm.cs">
+    <Compile Include="LiveTrading\LiveTradingManagerForm.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="LiveTrading\LiveTradingEntities.cs" />
-    <Compile Include="DataProviders\TradingData\TradingManager.cs" />
-    <Compile Include="DataProviders\TradingData\TradingProvider.cs" />
+    <Compile Include="DataProviders\TradingData\LiveTradingManager.cs" />
+    <Compile Include="DataProviders\TradingData\LiveTradingProvider.cs" />
+    <Compile Include="LiveTrading\SCRAM.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="LiveTrading\ScramManager.cs" />
+    <Compile Include="LiveTrading\TradeSummaryPanel.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="Migrations\202003201657087_CustomTags.cs" />
     <Compile Include="Migrations\202003201657087_CustomTags.designer.cs">
       <DependentUpon>202003201657087_CustomTags.cs</DependentUpon>
@@ -204,6 +228,9 @@
     <None Include="Properties\DataSources\SimulationManager.datasource" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Resources\Sounds\alarm.wav">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="Resources\DowJonesSecurities.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
@@ -231,14 +258,23 @@
     <EmbeddedResource Include="Components\SecurityInfoPanelNew.resx">
       <DependentUpon>SecurityInfoPanelNew.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="Components\SingleSecurityIndicatorForm.resx">
+      <DependentUpon>SingleSecurityIndicatorForm.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="LiveTrading\LiveAccountSummaryPanel.resx">
       <DependentUpon>LiveAccountSummaryPanel.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="LiveTrading\LiveQuoteForm.resx">
       <DependentUpon>LiveQuoteForm.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="LiveTrading\TradingAccountManagerForm.resx">
-      <DependentUpon>TradingAccountManagerForm.cs</DependentUpon>
+    <EmbeddedResource Include="LiveTrading\LiveTradeEntryForm.resx">
+      <DependentUpon>LiveTradeEntryForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="LiveTrading\LiveTradingManagerForm.resx">
+      <DependentUpon>LiveTradingManagerForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="LiveTrading\SCRAM.resx">
+      <DependentUpon>SCRAM.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Migrations\202003201657087_CustomTags.resx">
       <DependentUpon>202003201657087_CustomTags.cs</DependentUpon>

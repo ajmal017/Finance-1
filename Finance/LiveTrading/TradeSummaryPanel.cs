@@ -12,41 +12,41 @@ using System.Reflection;
 
 namespace Finance.LiveTrading
 {
-    public class PositionsSummaryPanel : Panel
+    public class TradeSummaryPanel : Panel
     {
         Font _defaultFont = SystemFont(8, FontStyle.Bold);
 
         #region Events
 
-        public event OpenPositionEventHandler SelectedPositionChanged;
-        private void OnSelectedPositionChanged()
+        public event LiveTradeEventHandler SelectedTradeChanged;
+        private void OnSelectedTradeChanged()
         {
-            SelectedPositionChanged?.Invoke(this, new OpenPositionEventArgs(SelectedPosition));
+            SelectedTradeChanged?.Invoke(this, new LiveTradeEventArgs(this.SelectedTrade));
         }
 
         #endregion
 
         public LiveAccount Account { get; private set; }
         Size _defaultSize = new Size(400, 300);
-        DataGridView positionsGrid = new DataGridView();
+        DataGridView tradeGrid = new DataGridView();
 
-        private LivePosition _SelectedPosition { get; set; }
-        public LivePosition SelectedPosition
+        private LiveTrade _SelectedTrade { get; set; }
+        public LiveTrade SelectedTrade
         {
             get
             {
-                if (positionsGrid.SelectedCells.Count == 0)
-                    _SelectedPosition = null;
+                if (tradeGrid.SelectedCells.Count == 0)
+                    _SelectedTrade = null;
                 else
                 {
-                    string ticker = positionsGrid.SelectedCells[0].Value.ToString();
-                    _SelectedPosition = Account.Portfolio.GetPosition<LivePosition>(ticker);
+                    int tradeId = (int)tradeGrid.SelectedCells[0].Value;
+                    _SelectedTrade = Account.Portfolio.GetTrade(tradeId);
                 }
-                return _SelectedPosition;
+                return _SelectedTrade;
             }
         }
 
-        public PositionsSummaryPanel()
+        public TradeSummaryPanel()
         {
             this.InitializeMe();
         }
@@ -54,30 +54,30 @@ namespace Finance.LiveTrading
         [Initializer]
         private void InitializePositionsGrid()
         {
-            positionsGrid.Dock = DockStyle.Fill;
-            positionsGrid.Name = "positionsGrid";
+            tradeGrid.Dock = DockStyle.Fill;
+            tradeGrid.Name = "positionsGrid";
 
-            positionsGrid.AutoGenerateColumns = false;
-            positionsGrid.AutoSize = false;
-            positionsGrid.ColumnHeadersVisible = true;
-            positionsGrid.RowHeadersVisible = false;
-            positionsGrid.AllowUserToResizeRows = false;
-            positionsGrid.AllowUserToResizeColumns = false;
-            positionsGrid.AllowUserToDeleteRows = false;
-            positionsGrid.AllowUserToAddRows = false;
-            positionsGrid.AllowUserToOrderColumns = false;
+            tradeGrid.AutoGenerateColumns = false;
+            tradeGrid.AutoSize = false;
+            tradeGrid.ColumnHeadersVisible = true;
+            tradeGrid.RowHeadersVisible = false;
+            tradeGrid.AllowUserToResizeRows = false;
+            tradeGrid.AllowUserToResizeColumns = false;
+            tradeGrid.AllowUserToDeleteRows = false;
+            tradeGrid.AllowUserToAddRows = false;
+            tradeGrid.AllowUserToOrderColumns = false;
 
             //
             // Headers            
             //
-            positionsGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            tradeGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
 
-            positionsGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            tradeGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
 
-            positionsGrid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(0, 0, 64);
-            positionsGrid.DefaultCellStyle.SelectionForeColor = Color.Goldenrod;
+            tradeGrid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(0, 0, 64);
+            tradeGrid.DefaultCellStyle.SelectionForeColor = Color.Goldenrod;
 
-            positionsGrid.Font = _defaultFont;
+            tradeGrid.Font = _defaultFont;
 
             var displayProperties = (from property in typeof(LivePosition).GetTypeInfo()
                          .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -89,55 +89,54 @@ namespace Finance.LiveTrading
             //
             foreach (var property in displayProperties)
             {
-                positionsGrid.Columns.Add(property.Name, property.GetCustomAttribute<DisplayValueAttribute>().Description);
-                positionsGrid.Columns[property.Name].DataPropertyName = property.Name;
+                tradeGrid.Columns.Add(property.Name, property.GetCustomAttribute<DisplayValueAttribute>().Description);
+                tradeGrid.Columns[property.Name].DataPropertyName = property.Name;
 
 
                 if (property.Name == "CompanyName")
-                    positionsGrid.Columns[property.Name].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+                    tradeGrid.Columns[property.Name].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
 
                 if (property.Name == "Size" || property.Name == "AverageCost")
-                    positionsGrid.Columns[property.Name].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                    tradeGrid.Columns[property.Name].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
 
-                positionsGrid.Columns[property.Name].DefaultCellStyle.Format =
+                tradeGrid.Columns[property.Name].DefaultCellStyle.Format =
                     property.GetCustomAttribute<DisplayValueAttribute>().DisplayFormat;
 
-                positionsGrid.Columns[property.Name].DefaultCellStyle.BackColor = Color.Black;
-                positionsGrid.Columns[property.Name].DefaultCellStyle.ForeColor = Color.Goldenrod;
+                tradeGrid.Columns[property.Name].DefaultCellStyle.BackColor = Color.Black;
+                tradeGrid.Columns[property.Name].DefaultCellStyle.ForeColor = Color.Goldenrod;
             }
 
             //
             // Handlers
             //
-            positionsGrid.SelectionChanged += (s, e) =>
+            tradeGrid.SelectionChanged += (s, e) =>
             {
-                OnSelectedPositionChanged();
+                OnSelectedTradeChanged();
             };
 
-            positionsGrid.CellFormatting += PositionsGrid_CellFormatting;
+            tradeGrid.CellFormatting += PositionsGrid_CellFormatting;
 
-            this.Controls.Add(positionsGrid);
+            this.Controls.Add(tradeGrid);
         }
 
         private void PositionsGrid_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
         {
-            if ((decimal)positionsGrid.Rows[e.RowIndex].Cells["Size"].Value == 0)
+            if ((decimal)tradeGrid.Rows[e.RowIndex].Cells["Size"].Value == 0)
             {
                 e.CellStyle.ForeColor = Color.Gray;
                 e.CellStyle.SelectionForeColor = Color.Gray;
             }
 
-            if (e.ColumnIndex == positionsGrid.Columns["UnrlPNLDollars"].Index)
+            if (e.ColumnIndex == tradeGrid.Columns["UnrlPNLDollars"].Index)
             {
                 e.CellStyle.ForeColor = (decimal)e.Value < 0 ? Color.PaleVioletRed : Color.PaleGreen;
                 e.CellStyle.SelectionForeColor = (decimal)e.Value < 0 ? Color.PaleVioletRed : Color.PaleGreen;
             }
-            if (e.ColumnIndex == positionsGrid.Columns["UnrlPNLPercent"].Index)
+            if (e.ColumnIndex == tradeGrid.Columns["UnrlPNLPercent"].Index)
             {
                 e.CellStyle.ForeColor = (decimal)e.Value < 0 ? Color.PaleVioletRed : Color.PaleGreen;
                 e.CellStyle.SelectionForeColor = (decimal)e.Value < 0 ? Color.PaleVioletRed : Color.PaleGreen;
             }
-
         }
 
         public void LoadAccount(LiveAccount account)
@@ -161,9 +160,7 @@ namespace Finance.LiveTrading
             var bindSource = new BindingSource();
             var positions = Account.Portfolio.Positions;
             bindSource.DataSource = positions;
-            positionsGrid.DataSource = bindSource;
+            tradeGrid.DataSource = bindSource;
         }
-
     }
-
 }

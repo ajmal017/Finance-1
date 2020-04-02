@@ -11,20 +11,20 @@ using static Finance.Helpers;
 
 namespace Finance.LiveTrading
 {
-    public class TradingAccountManagerForm : Form, IPersistLayout
+    public class LiveTradingManagerForm : Form, IPersistLayout
     {
-        private static TradingAccountManagerForm _Instance { get; set; }
-        public static TradingAccountManagerForm Instance
+        private static LiveTradingManagerForm _Instance { get; set; }
+        public static LiveTradingManagerForm Instance
         {
             get
             {
                 if (_Instance == null)
-                    _Instance = new TradingAccountManagerForm();
+                    _Instance = new LiveTradingManagerForm();
                 return _Instance;
             }
         }
 
-        private TradingAccountManager Manager { get; }
+        private LiveTradingManager Manager { get; }
 
         public bool Sizeable => false;
 
@@ -46,10 +46,12 @@ namespace Finance.LiveTrading
         private ToolStripMenuItem menuLiveQuoteWindow;
         private PositionsSummaryPanel pnlPositionSummary;
 
-        private TradingAccountManagerForm()
+        private LiveTradingManagerForm()
         {
             InitializeLogger();
             InitializeComponent();
+
+            this.Text = "Trading Account";
 
             this.FormClosing += (s, e) =>
             {
@@ -59,7 +61,7 @@ namespace Finance.LiveTrading
             this.Shown += (s, e) => LoadLayout();
             this.ResizeEnd += (s, e) => SaveLayout();
 
-            Manager = TradingAccountManager.Instance;
+            Manager = LiveTradingManager.Instance;
 
             LiveQuoteForm.Instance.Show();
 
@@ -68,7 +70,7 @@ namespace Finance.LiveTrading
 
         private void InitializeComponent()
         {
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(TradingAccountManagerForm));
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(LiveTradingManagerForm));
             this.menuStrip1 = new System.Windows.Forms.MenuStrip();
             this.accountToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menuShowLog = new System.Windows.Forms.ToolStripMenuItem();
@@ -99,7 +101,7 @@ namespace Finance.LiveTrading
             this.tradingToolStripMenuItem});
             this.menuStrip1.Location = new System.Drawing.Point(0, 0);
             this.menuStrip1.Name = "menuStrip1";
-            this.menuStrip1.Size = new System.Drawing.Size(773, 24);
+            this.menuStrip1.Size = new System.Drawing.Size(1082, 24);
             this.menuStrip1.TabIndex = 0;
             this.menuStrip1.Text = "menuStrip1";
             // 
@@ -128,7 +130,7 @@ namespace Finance.LiveTrading
             // menuLiveQuoteWindow
             // 
             this.menuLiveQuoteWindow.Name = "menuLiveQuoteWindow";
-            this.menuLiveQuoteWindow.Size = new System.Drawing.Size(180, 22);
+            this.menuLiveQuoteWindow.Size = new System.Drawing.Size(178, 22);
             this.menuLiveQuoteWindow.Text = "Live Quote Window";
             // 
             // statusStrip1
@@ -138,7 +140,7 @@ namespace Finance.LiveTrading
             this.btnAccountSelect});
             this.statusStrip1.Location = new System.Drawing.Point(0, 515);
             this.statusStrip1.Name = "statusStrip1";
-            this.statusStrip1.Size = new System.Drawing.Size(773, 22);
+            this.statusStrip1.Size = new System.Drawing.Size(1082, 22);
             this.statusStrip1.TabIndex = 1;
             this.statusStrip1.Text = "statusStrip1";
             // 
@@ -172,7 +174,7 @@ namespace Finance.LiveTrading
             this.tabMainPanel.Location = new System.Drawing.Point(0, 24);
             this.tabMainPanel.Name = "tabMainPanel";
             this.tabMainPanel.SelectedIndex = 0;
-            this.tabMainPanel.Size = new System.Drawing.Size(773, 491);
+            this.tabMainPanel.Size = new System.Drawing.Size(1082, 491);
             this.tabMainPanel.TabIndex = 2;
             // 
             // tabAccount
@@ -180,7 +182,7 @@ namespace Finance.LiveTrading
             this.tabAccount.Controls.Add(this.pnlAccountDisplay);
             this.tabAccount.Location = new System.Drawing.Point(4, 22);
             this.tabAccount.Name = "tabAccount";
-            this.tabAccount.Size = new System.Drawing.Size(765, 465);
+            this.tabAccount.Size = new System.Drawing.Size(1074, 465);
             this.tabAccount.TabIndex = 0;
             this.tabAccount.Text = "Account";
             this.tabAccount.UseVisualStyleBackColor = true;
@@ -189,7 +191,7 @@ namespace Finance.LiveTrading
             // 
             this.pnlAccountDisplay.Location = new System.Drawing.Point(8, 3);
             this.pnlAccountDisplay.Name = "pnlAccountDisplay";
-            this.pnlAccountDisplay.Size = new System.Drawing.Size(300, 459);
+            this.pnlAccountDisplay.Size = new System.Drawing.Size(301, 459);
             this.pnlAccountDisplay.TabIndex = 0;
             // 
             // tabPositions
@@ -198,7 +200,7 @@ namespace Finance.LiveTrading
             this.tabPositions.Location = new System.Drawing.Point(4, 22);
             this.tabPositions.Name = "tabPositions";
             this.tabPositions.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPositions.Size = new System.Drawing.Size(765, 465);
+            this.tabPositions.Size = new System.Drawing.Size(1074, 465);
             this.tabPositions.TabIndex = 1;
             this.tabPositions.Text = "Positions";
             this.tabPositions.UseVisualStyleBackColor = true;
@@ -209,7 +211,7 @@ namespace Finance.LiveTrading
             this.pnlPositionsMain.Dock = System.Windows.Forms.DockStyle.Fill;
             this.pnlPositionsMain.Location = new System.Drawing.Point(3, 3);
             this.pnlPositionsMain.Name = "pnlPositionsMain";
-            this.pnlPositionsMain.Size = new System.Drawing.Size(759, 459);
+            this.pnlPositionsMain.Size = new System.Drawing.Size(1068, 459);
             this.pnlPositionsMain.TabIndex = 0;
             // 
             // pnlPositionsSummaryMain
@@ -217,17 +219,18 @@ namespace Finance.LiveTrading
             this.pnlPositionsSummaryMain.Dock = System.Windows.Forms.DockStyle.Top;
             this.pnlPositionsSummaryMain.Location = new System.Drawing.Point(0, 0);
             this.pnlPositionsSummaryMain.Name = "pnlPositionsSummaryMain";
-            this.pnlPositionsSummaryMain.Size = new System.Drawing.Size(759, 212);
+            this.pnlPositionsSummaryMain.Size = new System.Drawing.Size(1068, 360);
             this.pnlPositionsSummaryMain.TabIndex = 0;
             // 
-            // TradingAccountManagerForm
+            // LiveTradingManagerForm
             // 
-            this.ClientSize = new System.Drawing.Size(773, 537);
+            this.ClientSize = new System.Drawing.Size(1082, 537);
             this.Controls.Add(this.tabMainPanel);
             this.Controls.Add(this.statusStrip1);
             this.Controls.Add(this.menuStrip1);
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedToolWindow;
             this.MainMenuStrip = this.menuStrip1;
-            this.Name = "TradingAccountManagerForm";
+            this.Name = "LiveTradingManagerForm";
             this.menuStrip1.ResumeLayout(false);
             this.menuStrip1.PerformLayout();
             this.statusStrip1.ResumeLayout(false);
@@ -251,7 +254,7 @@ namespace Finance.LiveTrading
 
             LogMessageType[] msgs = new LogMessageType[]
             {
-                 LogMessageType.TradingError, LogMessageType.TradingNotification, LogMessageType.TradingSystemMessage
+                 LogMessageType.TradingError, LogMessageType.TradingNotification, LogMessageType.TradingSystemMessage, LogMessageType.TradeWarning
             };
             tradeLogOutputForm = new LogOutputForm(msgs.ToList(), "Trading Log");
             tradeLogOutputForm.Show();
@@ -330,6 +333,10 @@ namespace Finance.LiveTrading
             };
             pnlPositionsSummaryMain.Controls.Add(pnlPositionSummary);
             Manager.ActiveAccountChanged += (s, e) =>
+            {
+                Invoke(new Action(() => { UpdatePositionSummary(); }));
+            };
+            Manager.PositionChanged += (s, e) =>
             {
                 Invoke(new Action(() => { UpdatePositionSummary(); }));
             };

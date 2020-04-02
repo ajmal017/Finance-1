@@ -134,7 +134,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [AccountValue("Total Cash", "$#,##0.00")]
+        [DisplayValue("Total Cash", "$#,##0.00")]
         public decimal TotalCashValue(DateTime AsOf)
         {
             // Starting Cash + (Purchases + Proceeds) + Commissions (as a negative number)
@@ -146,7 +146,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [AccountValue("Total Purchases & Proceeds", "$#,##0.00")]
+        [DisplayValue("Total Purchases & Proceeds", "$#,##0.00")]
         public decimal TotalCashPurchasesAndProceeds(DateTime AsOf)
         {
             return Positions.Sum(x => x.NetCashImpact(AsOf));
@@ -157,7 +157,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [AccountValue("Total Commission Paid", "$#,##0.00")]
+        [DisplayValue("Total Commission Paid", "$#,##0.00")]
         public decimal TotalCommissions(DateTime AsOf)
         {
             return Positions.Sum(x => TradingEnvironment.Instance.CommissionCharged(x.ExecutedTrades));
@@ -178,7 +178,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [AccountValue("Securities Market Value", "$#,##0.00")]
+        [DisplayValue("Securities Market Value", "$#,##0.00")]
         public decimal SecuritiesMarketValue(DateTime AsOf, TimeOfDay MarketValues)
         {
             return StockValue(AsOf, MarketValues);
@@ -189,7 +189,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [AccountValue("Long Value", "$#,##0.00")]
+        [DisplayValue("Long Value", "$#,##0.00")]
         public decimal LongStockValue(DateTime AsOf, TimeOfDay MarketValues)
         {
             return (from p in Positions
@@ -203,7 +203,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [AccountValue("Short Value", "$#,##0.00")]
+        [DisplayValue("Short Value", "$#,##0.00")]
         public decimal ShortStockValue(DateTime AsOf, TimeOfDay MarketValues)
         {
             return (from p in Positions
@@ -238,7 +238,7 @@ namespace Finance
             return 0m;
         }
 
-        [AccountValue("Equity With Loan", "$#,##0.00")]
+        [DisplayValue("Equity With Loan", "$#,##0.00")]
         public decimal EquityWithLoanValue(DateTime AsOf, TimeOfDay MarketValues)
         {
             return
@@ -254,7 +254,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [AccountValue("Available Funds", "$#,##0.00")]
+        [DisplayValue("Available Funds", "$#,##0.00")]
         public decimal AvailableFunds(DateTime AsOf, TimeOfDay MarketValues)
         {
             // Normal formula is ELV-IM, however IBKR counts Initial Margin as all trades, not just the day's. 
@@ -268,7 +268,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [AccountValue("Gross Position Value", "$#,##0.00")]
+        [DisplayValue("Gross Position Value", "$#,##0.00")]
         public decimal GrossPositionValue(DateTime AsOf, TimeOfDay MarketValues)
         {
             return
@@ -279,7 +279,7 @@ namespace Finance
                 FundValue(AsOf, MarketValues);
         }
 
-        [AccountValue("Net Liquidation Value", "$#,##0.00")]
+        [DisplayValue("Net Liquidation Value", "$#,##0.00")]
         public decimal NetLiquidationValue(DateTime AsOf, TimeOfDay MarketValues)
         {
             return
@@ -301,7 +301,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [AccountValue("Broker Initial Margin", "$#,##0.00")]
+        [DisplayValue("Broker Initial Margin", "$#,##0.00")]
         public decimal BrokerInitialMarginRequirement(DateTime AsOf, TimeOfDay MarketValues)
         {
             return Positions.Sum(pos => TradingEnvironment.Instance.BrokerMaintenanceMargin(pos, AsOf, MarketValues));
@@ -312,7 +312,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [AccountValue("Broker Maint. Margin", "$#,##0.00")]
+        [DisplayValue("Broker Maint. Margin", "$#,##0.00")]
         public decimal BrokerMaintenanceMarginRequirement(DateTime AsOf, TimeOfDay MarketValues)
         {
             return Positions.Sum(x => x.IsOpen(AsOf) ? TradingEnvironment.Instance.BrokerMaintenanceMargin(x, AsOf, MarketValues) : 0);
@@ -323,7 +323,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [AccountValue("Excess Liquidity", "$#,##0.00")]
+        [DisplayValue("Excess Liquidity", "$#,##0.00")]
         public decimal ExcessLiquidity(DateTime AsOf, TimeOfDay MarketValues)
         {
             return
@@ -340,7 +340,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>        
-        [AccountValue("Reg T Maint. Margin", "$#,##0.00")]
+        [DisplayValue("Reg T Maint. Margin", "$#,##0.00")]
         public decimal RegTMaintenanceMarginRequirement(DateTime AsOf, TimeOfDay MarketValues)
         {
             return Positions.Sum(x => x.IsOpen(AsOf) ? TradingEnvironment.Instance.RegTEndOfDayMargin(x, AsOf, MarketValues) : 0);
@@ -353,7 +353,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [AccountValue("Reg T Initial Margin", "$#,##0.00")]
+        [DisplayValue("Reg T Initial Margin", "$#,##0.00")]
         public decimal RegTInitialMarginRequirement(DateTime AsOf, TimeOfDay MarketValues)
         {
             try
@@ -401,7 +401,7 @@ namespace Finance
         /// </summary>
         /// <param name="AsOf"></param>
         /// <returns></returns>
-        [AccountValue("End of Day SMA Balance", "$#,##0.00")]
+        [DisplayValue("End of Day SMA Balance", "$#,##0.00")]
         public decimal SpecialMemorandumAccountBalance(DateTime AsOf, TimeOfDay MarketValues)
         {
             try
@@ -441,13 +441,13 @@ namespace Finance
             }
         }
 
-        [AccountValue("Total Realized PNL", "$#,##0.00")]
+        [DisplayValue("Total Realized PNL", "$#,##0.00")]
         public decimal TotalRealizedPNL(DateTime AsOf, TimeOfDay MarketValues)
         {
             return Positions.Sum(x => x.TotalRealizedPnL(AsOf));
         }
 
-        [AccountValue("Total Unrealized PNL", "$#,##0.00")]
+        [DisplayValue("Total Unrealized PNL", "$#,##0.00")]
         public decimal TotalUnrealizedPNL(DateTime AsOf, TimeOfDay MarketValues)
         {
             return Positions.Sum(x => x.TotalUnrealizedPnL(AsOf, MarketValues));

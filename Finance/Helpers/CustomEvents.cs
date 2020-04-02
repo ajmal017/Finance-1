@@ -161,6 +161,19 @@ namespace Finance
 
     #region Live Trading
 
+    public delegate void ScramEventHandler(object sender, ScramEventArgs e);
+    public class ScramEventArgs : EventArgs
+    {
+        public DateTime PressedTime { get; }
+        public bool UserInitiated { get; }
+
+        public ScramEventArgs(DateTime pressedTime, bool userInitiated)
+        {
+            PressedTime = pressedTime;
+            UserInitiated = userInitiated;
+        }
+    }
+
     public delegate void TradingAccountProviderStatusEventHandler(object sender, TradingAccountProviderStatusEventArgs e);
     public class TradingAccountProviderStatusEventArgs
     {
@@ -237,6 +250,27 @@ namespace Finance
             QuoteTime = quoteTime;
             QuotePrice = quotePrice;
             QuoteVolume = quoteVolume;
+        }
+    }
+
+    public delegate void LiveOrderEventHandler(object sender, LiveOrderEventArgs e);
+    public class LiveOrderEventArgs
+    {
+        public LiveOrder Order { get; }
+        public LiveOrderEventArgs(LiveOrder order)
+        {
+            Order = order ?? throw new ArgumentNullException(nameof(order));
+        }
+    }
+    
+    public delegate void LiveTradeEventHandler(object sender, LiveTradeEventArgs e);
+    public class LiveTradeEventArgs
+    {
+        public LiveTrade Trade { get; }
+
+        public LiveTradeEventArgs(LiveTrade trade)
+        {
+            Trade = trade ?? throw new ArgumentNullException(nameof(trade));
         }
     }
 

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using static Finance.Calendar;
@@ -136,6 +137,113 @@ namespace Finance
             public NetChangeByTrendType(TrendQualification trendType)
             {
                 this.TrendType = trendType;
+            }
+        }
+
+    }
+
+    public static class Candlesticks
+    {
+        public static void SetCandlestickPatterns(this Security me)
+        {
+            var methods = (from m in typeof(Candlesticks).GetTypeInfo().GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
+                           where Attribute.IsDefined(m, typeof(IncludeAttribute))
+                           select m).ToList();
+
+            foreach (var method in methods)
+            {
+                if (method.GetCustomAttribute<IncludeAttribute>().Include)
+                {
+                    foreach (PriceBar bar in me.GetPriceBars(PriceBarSize.Daily))
+                        method.Invoke(null, new[] { bar });
+                }
+            }
+        }
+
+        [Include(true)]
+        private static void Candlestick_Hammer(this PriceBar me)
+        {
+            decimal wickToBody = 2.0m;
+            decimal upperWickLimit = .25m;
+
+            // Bottom of a down trend, with a lower wick at least 2x body, closing at or near high
+
+            // Define downtrend using SP bar count
+            var priorBars = me.PriorBars(3, false);
+            if (priorBars.Count < 3)
+            {
+                me.SetCandlestickFlag(CandleStickPattern.BullishHammer, false);
+                return;
+            }
+
+            if (priorBars.Min(x => x.Low) <= Math.Min(me.Open, me.Close))
+            {
+                me.SetCandlestickFlag(CandleStickPattern.BullishHammer, false);
+                return;
+            }
+
+            var lowerWick = Math.Min(me.Open, me.Close) - me.Low;
+            var upperWick = me.High - Math.Max(me.Open, me.Close);
+            var body = Math.Abs(me.Change);
+
+            if (lowerWick < 0)
+            {
+                me.SetCandlestickFlag(CandleStickPattern.BullishHammer, false);
+                return;
+            }
+            if (body > 0 && lowerWick / body < wickToBody)
+            {
+                me.SetCandlestickFlag(CandleStickPattern.BullishHammer, false);
+                return;
+            }
+            if (lowerWick < me.AverageTrueRange())
+            {
+                me.SetCandlestickFlag(CandleStickPattern.BullishHammer, false);
+                return;
+            }
+            if (upperWick > body * upperWickLimit)
+            {
+                me.SetCandlestickFlag(CandleStickPattern.BullishHammer, false);
+                return;
+            }
+
+            me.SetCandlestickFlag(CandleStickPattern.BullishHammer, true);
+            return;
+
+        }
+    }
+
+    public static class Technicals
+    {
+        public static void SetTechnicals(this Security me)
+        {
+            var methods = (from m in typeof(Technicals).GetTypeInfo().GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
+                           where Attribute.IsDefined(m, typeof(IncludeAttribute))
+                           select m).ToList();
+
+            foreach (var method in methods)
+            {
+                if (method.GetCustomAttribute<IncludeAttribute>().Include)
+                {
+                    foreach (PriceBar bar in me.GetPriceBars(PriceBarSize.Daily))
+                        method.Invoke(null, new[] { bar });
+                }
+            }
+        }
+
+        [Include(true)]
+        private static void Technical_Volume(this PriceBar me)
+        {
+            if (me.PriorBar == null)
+                return;
+
+            if (me.Volume > me.PriorBar.Volume)
+            {
+                me.SetTechnicalFlag(Technical.RisingVolume, true);
+            }
+            else if (me.Volume < me.PriorBar.Volume)
+            {
+                me.SetTechnicalFlag(Technical.FallingVolume, true);
             }
         }
     }

@@ -74,12 +74,7 @@ namespace Finance
             MinimumSize = _defaultSize;
             MaximumSize = _defaultSize;
             BackColor = Color.Black;
-            BorderStyle = BorderStyle.FixedSingle;
-
-            this.Paint += (s, e) =>
-            {
-                ControlPaint.DrawBorder(e.Graphics, this.ClientRectangle, Color.Gray, ButtonBorderStyle.Outset);
-            };
+           BorderStyle = BorderStyle.FixedSingle;
         }
         [Initializer]
         private void InitializeDisplay()
@@ -121,7 +116,7 @@ namespace Finance
             {
                 lblStatusMsg.Text = AttachedControl.StatusMessage;
                 lblStatusMsg2.Text = AttachedControl.StatusMessage2;
-                Invalidate();
+                //Invalidate();
             };
 
         }

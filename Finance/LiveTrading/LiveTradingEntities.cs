@@ -30,40 +30,40 @@ namespace Finance.LiveTrading
 
         public string AccountId { get; }
 
-        [AccountValue("Available Funds", "$#,##0.00")]
+        [DisplayValue("Available Funds", "$#,##0.00")]
         public decimal AvailableFunds { get; set; }
-        [AccountValue("Buying Power", "$#,##0.00")]
+        [DisplayValue("Buying Power", "$#,##0.00")]
         public decimal BuyingPower { get; set; }
-        [AccountValue("Cash Balance", "$#,##0.00")]
+        [DisplayValue("Cash Balance", "$#,##0.00")]
         public decimal CashBalance { get; set; }
 
-        [AccountValue("Equity with Loan Value", "$#,##0.00")]
+        [DisplayValue("Equity with Loan Value", "$#,##0.00")]
         public decimal EquityWithLoanValue { get; set; }
-        [AccountValue("Excess Liquidity", "$#,##0.00")]
+        [DisplayValue("Excess Liquidity", "$#,##0.00")]
         public decimal ExcessLiquidity { get; set; }
-        [AccountValue("Initial Margin Requirement", "$#,##0.00")]
+        [DisplayValue("Initial Margin Requirement", "$#,##0.00")]
         public decimal InitMarginReq { get; set; }
-        [AccountValue("Maintenance Margin Requirement", "$#,##0.00")]
+        [DisplayValue("Maintenance Margin Requirement", "$#,##0.00")]
         public decimal MaintMarginReq { get; set; }
 
-        [AccountValue("Gross Position Value", "$#,##0.00")]
+        [DisplayValue("Gross Position Value", "$#,##0.00")]
         public decimal GrossPositionValue { get; set; }
-        [AccountValue("Net Liquidation Value", "$#,##0.00")]
+        [DisplayValue("Net Liquidation Value", "$#,##0.00")]
         public decimal NetLiquidation { get; set; }
-        [AccountValue("Market Value of Stock", "$#,##0.00")]
+        [DisplayValue("Market Value of Stock", "$#,##0.00")]
         public decimal StockMarketValue { get; set; }
 
 
-        [AccountValue("Reg T Margin Balance", "$#,##0.00")]
+        [DisplayValue("Reg T Margin Balance", "$#,##0.00")]
         public decimal RegTMargin { get; set; }
-        [AccountValue("Reg T Equity", "$#,##0.00")]
+        [DisplayValue("Reg T Equity", "$#,##0.00")]
         public decimal RegTEquity { get; set; }
-        [AccountValue("SMA Account Balance", "$#,##0.00")]
+        [DisplayValue("SMA Account Balance", "$#,##0.00")]
         public decimal SMA { get; set; }
 
-        [AccountValue("Realized PNL", "$#,##0.00")]
+        [DisplayValue("Realized PNL", "$#,##0.00")]
         public decimal RealizedPnL { get; set; }
-        [AccountValue("Unrealized PNL", "$#,##0.00")]
+        [DisplayValue("Unrealized PNL", "$#,##0.00")]
         public decimal UnrealizedPnL { get; set; }
 
         public virtual LivePortfolio Portfolio { get; protected set; }
@@ -154,18 +154,26 @@ namespace Finance.LiveTrading
         public LivePortfolio(string accountId)
         {
             this.AccountId = accountId;
-            this.Positions = new BindingList<LivePosition>();
+            this.Positions = new List<LivePosition>();
             this.Trades = new List<LiveTrade>();
         }
 
         public string AccountId { get; protected set; }
-        public virtual BindingList<LivePosition> Positions { get; protected set; }
+        public virtual List<LivePosition> Positions { get; protected set; }
         protected virtual List<LiveTrade> Trades { get; set; }
 
         public void AddTrade(LiveTrade trade)
         {
-
+            if (!Trades.Exists(x => x.TradeId == trade.TradeId))
+            {
+                Trades.Add(trade);
+            }
         }
+        public LiveTrade GetTrade(int tradeId)
+        {
+            return Trades.Find(X => X.TradeId == tradeId);
+        }
+
         public bool HasOpenPosition(string ticker)
         {
             return Positions.SingleOrDefault(x => x.Ticker == ticker && x.IsOpen) != null;
@@ -174,7 +182,7 @@ namespace Finance.LiveTrading
         {
             var ret = (from position in Positions
                        where position.Security.Ticker == security.Ticker
-                       where position.IsOpen
+                       //where position.IsOpen
                        select position).SingleOrDefault();
 
             if (ret != null)
@@ -199,7 +207,6 @@ namespace Finance.LiveTrading
         {
             return includeClosed ? this.Positions as List<T> : this.Positions.Where(x => x.IsOpen).ToList() as List<T>;
         }
-
     }
     public class IbkrPortfolio : LivePortfolio
     {
@@ -209,7 +216,7 @@ namespace Finance.LiveTrading
 
     }
 
-    public class LivePosition
+    public class LivePosition : INotifyPropertyChanged
     {
         #region Events
 
@@ -219,18 +226,33 @@ namespace Finance.LiveTrading
             PositionChanged?.Invoke(this, new OpenPositionEventArgs(position));
         }
 
+        public event PropertyChangedEventHandler PropertyChanged;
+        private void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
         #endregion
 
-        public Security Security { get; set; }
+        private Security _Security { get; set; }
+        public Security Security
+        {
+            get => _Security;
+            set
+            {
+                _Security = value;
+                _Security.PropertyChanged += (s, e) => OnPropertyChanged(e.PropertyName);
+            }
+        }
 
-        [AccountValue("Symbol", "")]
+        [DisplayValue("Symbol", "")]
         public string Ticker => Security?.Ticker ?? string.Empty;
 
-        [AccountValue("Company", "")]
+        [DisplayValue("Company", "")]
         public string CompanyName => Security?.LongName ?? string.Empty;
 
         private decimal _AverageCost { get; set; }
-        [AccountValue("Average Cost", "$#,##0.00")]
+        [DisplayValue("Average Cost", "$#,##0.00")]
         public decimal AverageCost
         {
             get => _AverageCost;
@@ -245,7 +267,7 @@ namespace Finance.LiveTrading
         }
 
         private decimal _Size { get; set; }
-        [AccountValue("Position Size", "#,##0.0")]
+        [DisplayValue("Position Size", "#,##0.0")]
         public decimal Size
         {
             get => _Size;
@@ -258,6 +280,46 @@ namespace Finance.LiveTrading
                 }
             }
         }
+
+        [DisplayValue("Basis Cost", "$#,##0.0")]
+        public decimal BasisCost
+        {
+            get => Size * AverageCost;
+        }
+
+        [DisplayValue("Last Trade", "$#,##0.00")]
+        public decimal LastTrade => Security.LastTrade;
+
+        [DisplayValue("Market Value", "$#,##0.0")]
+        public decimal MarketValue
+        {
+            get => LastTrade * Size;
+        }
+
+        private decimal? _UnrlPNLDollars { get; set; } = null;
+        [DisplayValue("Unrl. PNL", "$#,##0.00")]
+        public decimal UnrlPNLDollars
+        {
+            get
+            {
+                if (LastTrade == 0)
+                    return _UnrlPNLDollars ?? 0;
+                else
+                    return (LastTrade - AverageCost) * Size;
+            }
+        }
+
+        [DisplayValue("PNL %", "0.00%")]
+        public decimal UnrlPNLPercent
+        {
+            get
+            {
+                if (AverageCost == 0)
+                    return 0;
+                return (UnrlPNLDollars / Size / AverageCost) * Math.Sign(Size);
+            }
+        }
+
         public bool IsOpen => Size != 0;
 
         public PositionDirection PositionDirection => Size > 0 ? PositionDirection.LongPosition : PositionDirection.ShortPosition;
@@ -275,6 +337,10 @@ namespace Finance.LiveTrading
                 this.AverageCost = averageCost.Value;
 
             OnPositionChanged(this);
+        }
+        public void BrokerReportedUnrlPnl(decimal pnl)
+        {
+            this._UnrlPNLDollars = pnl;
         }
     }
     public class IbkrPosition : LivePosition
@@ -296,34 +362,77 @@ namespace Finance.LiveTrading
         public IbkrPosition() { }
     }
 
+    public class LiveOrder
+    {
+        public Security Security { get; }
+
+        [DisplayValue("Order Direction", "")]
+        public TradeActionBuySell OrderDirection { get; }
+
+        [DisplayValue("Order Type", "")]
+        public TradeType OrderType { get; }
+
+        [DisplayValue("Limit Px", "$#,##0.00")]
+        public decimal LimitPrice { get; }
+
+        [DisplayValue("Order Size", "#,##0.00")]
+        public decimal OrderSize { get; }
+
+        [DisplayValue("Limit Px", "$#,##0.00")]
+        public decimal TotalMoney => OrderSize * LimitPrice * -(OrderDirection.ToInt());
+
+        [DisplayValue("Commission", "$#,##0.00")]
+        public decimal Commission => TradingEnvironment.Instance.CommissionCharged(this);
+
+        public LiveOrder(Security security, TradeActionBuySell tradeActionBuySell, decimal size, decimal limitPrice, TradeType orderType)
+        {
+            Security = security ?? throw new ArgumentNullException(nameof(security));
+            OrderDirection = tradeActionBuySell;
+            LimitPrice = limitPrice;
+            OrderSize = size;
+            OrderType = orderType;
+        }
+
+        public override string ToString()
+        {
+            return string.Format($"{OrderDirection.Description()} {OrderSize} {Security.Ticker} @ {LimitPrice:$#,##0.00}");
+        }
+    }
+
     public class LiveTrade
     {
-        Security Security { get; } = null;
+        public int TradeId { get; set; }
 
-        public LiveTradeStatus TradeStatus { get; private set; } = LiveTradeStatus.NotSet;
+        public Security Security { get; } = null;
+
+        public int ApprovalCode { get; set; }
+
+        public TradeActionBuySell TradeDirection { get; } = TradeActionBuySell.None;
+        public TradeType TradeType { get; }
+
+        public LiveTradeStatus TradeStatus { get; set; } = LiveTradeStatus.NotSet;
 
         public decimal SubmittedQuantity { get; private set; }
-        private List<decimal> FilledQuantities = new List<decimal>();
-        public decimal FilledQuantity => FilledQuantities.Sum();
+        public decimal FilledQuantity { get; set; }
         public decimal UnfilledQuantity => SubmittedQuantity - FilledQuantity;
 
         public decimal LimitPrice { get; } = -1;
         public decimal LastFillPrice { get; set; }
         public decimal AverageFillPrice { get; set; }
 
-    }
-
-    public class LiveOrder
-    {
-        public Security Security { get; }
-        public TradeActionBuySell TradeActionBuySell { get; }
-        public decimal LimitPrice { get; }
-
-        public LiveOrder(Security security, TradeActionBuySell tradeActionBuySell, decimal limitPrice)
+        public LiveTrade(Security security, TradeActionBuySell tradeDirection, TradeType tradeType, decimal submittedQuantity, decimal limitPrice)
         {
             Security = security ?? throw new ArgumentNullException(nameof(security));
-            TradeActionBuySell = tradeActionBuySell;
+            TradeDirection = tradeDirection;
+            TradeType = tradeType;
+            SubmittedQuantity = submittedQuantity;
             LimitPrice = limitPrice;
         }
+
+        public override string ToString()
+        {
+            return string.Format($"{TradeDirection.Description()} {SubmittedQuantity} {Security.Ticker} @ {LimitPrice:$#,##0.00}");
+        }
     }
+
 }

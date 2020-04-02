@@ -22,7 +22,8 @@ namespace Finance
         PortfolioParameters = 10,
         PositionManagementParameters = 11,
         IndexManagementParameters = 12,
-        LiveTrading = 13
+        LiveTrading = 13,
+        LiveRisk = 14
     }
     public enum ApplicationMode
     {
@@ -88,10 +89,13 @@ namespace Finance
     public enum TradeActionBuySell
     {
         // Sell to close or short
+        [Description("SELL")]
         Sell = -1,
         // Default
+        [Description("Not Set")]
         None = 0,
         // Buy to open or cover
+        [Description("BUY")]
         Buy = 1
     }
     public enum SignalAction
@@ -130,10 +134,13 @@ namespace Finance
     public enum TradeType
     {
         // Trade will execute at the prevailing bid/ask
+        [Description("MKT")]
         Market = 0,
         // Trade will execute at Limit Price if Limit Price == bid/ask
+        [Description("LMT")]
         Limit = 1,
         // Trade will execute at the prevailing bid/ask if Stop Price is touched
+        [Description("STP")]
         Stop = 2
     }
     public enum PositionDirection
@@ -169,6 +176,7 @@ namespace Finance
         LongShort = 2
     }
 
+    [Flags]
     public enum SwingPointType
     {
         [Description("None")]
@@ -274,7 +282,9 @@ namespace Finance
         SecurityError = 3,
         TradingNotification = 4,
         TradingError = 5,
-        TradingSystemMessage = 6
+        TradingSystemMessage = 6,
+        SCRAM = 7,
+        TradeWarning = 8
     }
     public enum ControlEdge
     {
@@ -391,6 +401,7 @@ namespace Finance
         Disconnected = 2
     }
 
+    [Flags]
     public enum CustomSecurityTag
     {
         [Description("No Flags")]
@@ -407,6 +418,7 @@ namespace Finance
         ZeroVolume = 16
 
     }
+    [Flags]
     public enum CustomPriceBarTag
     {
         [Description("No Flags")]
@@ -416,6 +428,7 @@ namespace Finance
         [Description("Favorite")]
         Favorite = 2
     }
+
     public enum SecurityFilterType
     {
         None = 0,
@@ -433,5 +446,28 @@ namespace Finance
         Ask = 2,
         Open = 3,
         Trade = 4
+    }
+    public enum LiveTradeApprovalMessageType
+    {
+        [Description("FAILED")]
+        Failed = 0,
+        [Description("PASSED")]
+        Passed = 1, 
+        [Description("WARNING")]
+        Warning = 2
+    }
+
+    [Flags]
+    public enum CandleStickPattern
+    {
+        None = 0,
+        BullishHammer = 1,
+    }
+    [Flags]
+    public enum Technical
+    {
+        None = 0,
+        RisingVolume = 1,
+        FallingVolume = 2
     }
 }

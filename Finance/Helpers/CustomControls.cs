@@ -14,108 +14,12 @@ using Finance.TradeStrategies;
 using Finance.LiveTrading;
 using Timer = System.Windows.Forms.Timer;
 using static Finance.Helpers;
+using static Finance.Logger;
 using System.Data;
 using System.ComponentModel;
 
 namespace Finance
 {
-    #region ControlManager
-
-    /*
-     *  ControlManagers allow a non-UI class to issue UI components and maintain the ability to push updates
-     *  rather than making the subscribing class implement some sort of check or callback.
-     *  
-     *  Abstract class provides basic functionality to issue and maintain a Control, implementations will
-     *  specify the type of Control (Label, Panel, Custom, etc) to issue.
-     */
-
-    public abstract class ControlManager
-    {
-        protected List<Control> issuedControls = new List<Control>();
-        protected string ParentName { get; set; }
-
-        protected ControlManager(string parentName)
-        {
-            ParentName = parentName ?? throw new ArgumentNullException(nameof(parentName));
-        }
-
-        public Control IssueControl()
-        {
-            return issuedControls.AddAndReturn(_IssueControl());
-        }
-        protected abstract Control _IssueControl();
-    }
-
-    #endregion
-    #region Status Indicator Manager and Controls
-
-    //
-    // ControlManager implementation which issues a Label control to display current status of a process
-    //
-
-    public class StatusLabelControlManager : ControlManager
-    {
-        private (string text, Color color)? LastStatus = null;
-
-        public StatusLabelControlManager(string parentName) : base(parentName)
-        {
-        }
-
-        protected override Control _IssueControl()
-        {
-            var ret = issuedControls.AddAndReturn(new StatusIndicatorLabel(ParentName, issuedControls.Count));
-            if (LastStatus != null)
-                SetStatus(LastStatus.Value.text, LastStatus.Value.color);
-            return ret;
-        }
-
-        public void SetStatus(string text, Color color, bool displayName = true)
-        {
-            foreach (StatusIndicatorLabel ctrl in issuedControls)
-            {
-                if (ctrl.InvokeRequired)
-                    ctrl.Invoke(new Action(() => ctrl.SetStatus(text, color, displayName)));
-                else
-                    ctrl.SetStatus(text, color, displayName);
-            }
-
-            LastStatus = (text, color);
-        }
-    }
-    public class StatusIndicatorLabel : Label
-    {
-        public string DisplayName { get; set; }
-
-        public StatusIndicatorLabel(string name, int instance)
-        {
-            Name = name + instance.ToString();
-            DisplayName = Text = name;
-            TextAlign = ContentAlignment.MiddleCenter;
-            BorderStyle = BorderStyle.FixedSingle;
-            BackColor = Color.LightBlue;
-        }
-        public void SetStatus(string text, Color color, bool displayName)
-        {
-            if (InvokeRequired)
-            {
-                Invoke(new Action(() =>
-                {
-                    SetStatus(text, color, displayName);
-                }));
-                return;
-            }
-
-            Text = displayName ? $"{DisplayName}: {text}" : $"{text}";
-            BackColor = color;
-            Refresh();
-        }
-    }
-
-    #endregion
-    #region New Status Indicator Panel
-
-
-    #endregion
     #region Security List Box
 
     public class SecurityListGrid : Panel
@@ -1252,10 +1156,6 @@ namespace Finance
     public class LiveQuotePanel : UserControl
     {
 
-        #region Events
-
-        #endregion
-
         Size _defaultSize = new Size(400, 250);
 
         Label lblSymbol;
@@ -1636,6 +1536,21 @@ namespace Finance
 
             lblSymbol.Text = ActiveSecurity.Ticker;
             ClearAllQuotes();
+
+            if (this.ActiveSecurity.LastBid != 0)
+                UpdateBid(DateTime.MinValue, this.ActiveSecurity.LastBid, 0);
+
+            if (this.ActiveSecurity.LastAsk != 0)
+                UpdateAsk(DateTime.MinValue, this.ActiveSecurity.LastAsk, 0);
+
+            if (this.ActiveSecurity.LastTrade != 0)
+                UpdateLastTrade(DateTime.MinValue, this.ActiveSecurity.LastTrade, 0);
+
+            if (this.ActiveSecurity.LastClose != 0)
+                this.open = this.ActiveSecurity.LastClose;
+
+            UpdateStats();
+
             Refresh();
         }
 
@@ -1709,7 +1624,11 @@ namespace Finance
 
             lblBidPrice.Text = $"{quotePrice:$0.000}";
             lblBidVolume.Text = $"{quoteVolume:0}";
-            lblBidTime.Text = $"{quoteTime:MM/dd/yy hh:mm:ss}";
+
+            if (quoteTime != DateTime.MinValue)
+                lblBidTime.Text = $"{quoteTime:MM/dd/yy hh:mm:ss}";
+            else
+                lblBidTime.Text = "Stale";
         }
         private void UpdateAsk(DateTime quoteTime, decimal quotePrice, long quoteVolume)
         {
@@ -1723,7 +1642,11 @@ namespace Finance
 
             lblAskPrice.Text = $"{quotePrice:$0.000}";
             lblAskVolume.Text = $"{quoteVolume:0}";
-            lblAskTime.Text = $"{quoteTime:MM/dd/yy hh:mm:ss}";
+
+            if (quoteTime != DateTime.MinValue)
+                lblAskTime.Text = $"{quoteTime:MM/dd/yy hh:mm:ss}";
+            else
+                lblAskTime.Text = "Stale";
         }
         private void UpdateLastTrade(DateTime tradeTime, decimal tradePrice, long tradeSize)
         {
@@ -1735,7 +1658,11 @@ namespace Finance
 
             lblLastTradePrice.Text = $"{tradePrice:$0.000}";
             lblLastTradeVolume.Text = $"{tradeSize:0}";
-            lblLastTradeTime.Text = $"{tradeTime:MM/dd/yy hh:mm:ss}";
+
+            if (tradeTime != DateTime.MinValue)
+                lblLastTradeTime.Text = $"{tradeTime:MM/dd/yy hh:mm:ss}";
+            else
+                lblLastTradeTime.Text = "Stale";
         }
         private void UpdateStats()
         {
@@ -1764,6 +1691,207 @@ namespace Finance
             lblChangePercent.Text = $"{changePercent:0.00%}";
         }
 
+    }
+    public class LiveMiniQuotePanel : UserControl
+    {
+        Size _defaultSize = new Size(125, 100);
+
+        Label lblSymbol;
+        Label lblBidAsk;
+        Label lblChange;
+
+        public Security ActiveSecurity { get; private set; }
+        private decimal open { get; set; } = -1;
+        private decimal lastBid { get; set; } = -1;
+        private decimal lastAsk { get; set; } = -1;
+        private decimal lastTrade { get; set; } = -1;
+
+        public LiveMiniQuotePanel()
+        {
+            this.InitializeMe();
+        }
+
+        [Initializer]
+        private void InitializeStyles()
+        {
+            this.Size = _defaultSize;
+            this.MinimumSize = _defaultSize;
+            this.MaximumSize = _defaultSize;
+            this.BackColor = Color.Black;
+
+            lblSymbol = new Label()
+            {
+                Text = "SYMB",
+                Width = this.Width,
+                Font = SystemFont(24, FontStyle.Bold),
+                ForeColor = Color.White,
+                Height = 40,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 0)
+            };
+            this.Controls.Add(lblSymbol);
+        }
+        [Initializer]
+        private void InitializeDataHandler()
+        {
+            LiveDataProvider.Instance.LiveQuoteReceived += (s, e) =>
+            {
+                if (this.Created)
+                    UpdateQuote(e.security, e.QuoteType, e.QuoteTime, e.QuotePrice, e.QuoteVolume);
+            };
+        }
+        [Initializer]
+        private void InitializeBidAsk()
+        {
+            Label lblBA = new Label()
+            {
+                Text = "Bid  Ask",
+                ForeColor = Color.Gray,
+                Font = SystemFont(8, FontStyle.Bold),
+                Width = this.Width,
+                Height = 20,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 35)
+            };
+            lblBidAsk = new Label()
+            {
+                Name = "BidAsk",
+                Text = "0.00  0.00",
+                ForeColor = Color.Goldenrod,
+                Font = SystemFont(9, FontStyle.Bold),
+                Width = this.Width,
+                Height = 20,
+                TextAlign = ContentAlignment.TopCenter,
+                Location = new Point(0, 55)
+            };
+            this.Controls.AddRange(new[] { lblBidAsk, lblBA });
+        }
+        [Initializer]
+        private void InitializeChange()
+        {
+            lblChange = new Label()
+            {
+                Name = "Change",
+                Text = "$0.00  0.00%",
+                ForeColor = Color.White,
+                Font = SystemFont(8, FontStyle.Bold),
+                Width = this.Width,
+                Height = 20,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 75)
+            };
+            this.Controls.Add(lblChange);
+        }
+
+        public void LoadSecurity(Security security)
+        {
+            if (this.ActiveSecurity == security)
+                return;
+
+            this.ActiveSecurity = security;
+
+            this.ActiveSecurity.PropertyChanged += (s, e) =>
+            {
+                UpdateBidAsk();
+                UpdateStats();
+            };
+
+            UpdateSymbolLabel();
+        }
+        private void UpdateSymbolLabel()
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action(() => UpdateSymbolLabel()));
+                return;
+            }
+
+            lblSymbol.Text = ActiveSecurity.Ticker;
+            ClearAllQuotes();
+
+            if (this.ActiveSecurity.LastBid != 0 || this.ActiveSecurity.LastAsk != 0)
+                UpdateBidAsk();
+
+            if (this.ActiveSecurity.LastClose != 0)
+                this.open = this.ActiveSecurity.LastClose;
+
+            UpdateStats();
+
+            Refresh();
+        }
+
+        private void ClearAllQuotes()
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action(() => ClearAllQuotes()));
+                return;
+            }
+
+            lblBidAsk.Text = " -  /  - ";
+            lblChange.Text = "$-   -%";
+            lblChange.ForeColor = Color.White;
+        }
+
+        public void UpdateQuote(Security security, LiveQuoteType quoteType, DateTime quoteTime, decimal quotePrice, long quoteVolume = 0)
+        {
+            if (security != ActiveSecurity)
+                return;
+
+            switch (quoteType)
+            {
+                case LiveQuoteType.NotSet:
+                    break;
+                case LiveQuoteType.Bid:
+                    lastBid = quotePrice;
+                    UpdateBidAsk();
+                    break;
+                case LiveQuoteType.Ask:
+                    lastAsk = quotePrice;
+                    UpdateBidAsk();
+                    break;
+                case LiveQuoteType.Open:
+                    this.open = quotePrice;
+                    UpdateStats();
+                    break;
+                case LiveQuoteType.Trade:
+                    this.lastTrade = quotePrice;
+                    UpdateStats();
+                    break;
+                default:
+                    break;
+            }
+        }
+        private void UpdateBidAsk()
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action(() => UpdateBidAsk()));
+                return;
+            }
+
+            lblBidAsk.Text = $"{ActiveSecurity.LastBid:0.00} / {ActiveSecurity.LastAsk:0.00}";
+        }
+        private void UpdateStats()
+        {
+            if (ActiveSecurity.LastClose == 0)
+                return;
+
+            if (InvokeRequired)
+            {
+                Invoke(new Action(() => UpdateStats()));
+                return;
+            }
+
+            if (ActiveSecurity.LastTrade == 0)
+                return;
+
+            var changeDollars = (ActiveSecurity.LastTrade - ActiveSecurity.LastClose);
+            var changePercent = (ActiveSecurity.LastTrade - ActiveSecurity.LastClose) / ActiveSecurity.LastClose;
+
+            lblChange.ForeColor = changeDollars < 0 ? Color.PaleVioletRed : Color.LightGreen;
+            lblChange.Text = $"{changeDollars:$0.00}  {changePercent:0.00%}";
+        }
     }
 
     public class LiveIntradayTickChartPanel : Panel
@@ -1823,6 +1951,12 @@ namespace Finance
 
         public void LoadSecurity(Security security)
         {
+            if (InvokeRequired)
+            {
+                Invoke(new Action(() => LoadSecurity(security)));
+                return;
+            }
+
             if (this.Security == security)
                 return;
 
@@ -2004,6 +2138,69 @@ namespace Finance
                 Points.Last().LabelFormat = "$0.00";
                 Points.Last().LabelForeColor = Color.White;
             }
+        }
+    }
+
+    #endregion
+    #region ComboBox<T>
+
+    public class ComboBox<TEnum> : ComboBox where TEnum : struct
+    {
+        bool SuspendIndexChanged { get; set; } = false;
+        bool SuspendItemChanged { get; set; } = false;
+        bool SuspendValueChanged { get; set; } = false;
+
+        protected override void OnSelectedIndexChanged(EventArgs e)
+        {
+            if (!SuspendIndexChanged)
+                base.OnSelectedIndexChanged(e);
+
+            SuspendIndexChanged = false;
+        }
+        protected override void OnSelectedItemChanged(EventArgs e)
+        {
+            if (!SuspendItemChanged)
+                base.OnSelectedItemChanged(e);
+            SuspendItemChanged = false;
+        }
+        protected override void OnSelectedValueChanged(EventArgs e)
+        {
+            if (!SuspendValueChanged)
+                base.OnSelectedValueChanged(e);
+            SuspendValueChanged = false;
+        }
+
+        public ComboBox()
+        {
+            this.Items.Clear();
+            foreach (Enum e in Enum.GetValues(typeof(TEnum)))
+            {
+                this.Items.Add(e.Description());
+            }
+        }
+
+        public void SetSelectedValue(TEnum value, bool suspendEvents = false)
+        {
+            if (suspendEvents)
+            {
+                SuspendIndexChanged = true;
+                SuspendItemChanged = true;
+                SuspendValueChanged = true;
+            }
+            base.SelectedIndex = this.Items.IndexOf((value as Enum).Description());
+        }
+        public TEnum GetSelectedValue()
+        {
+            return (TEnum)(object)(base.SelectedItem as string).EnumFromDescription(typeof(TEnum));
+        }
+        public void AddItem(TEnum value)
+        {
+            this.Items.Add((value as Enum).Description());
+        }
+        public void RemoveItem(TEnum value)
+        {
+            if (this.Items.Contains((value as Enum).Description()))
+                this.Items.Remove((value as Enum).Description());
         }
     }
 

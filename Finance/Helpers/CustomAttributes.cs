@@ -148,12 +148,12 @@ namespace Finance
     #endregion
     #region Live Trading
 
-    public class AccountValueAttribute : Attribute
+    public class DisplayValueAttribute : Attribute
     {
         public string Description { get; }
         public string DisplayFormat { get; }
 
-        public AccountValueAttribute(string description, string displayFormat)
+        public DisplayValueAttribute(string description, string displayFormat)
         {
             Description = description ?? throw new ArgumentNullException(nameof(description));
             DisplayFormat = displayFormat ?? throw new ArgumentNullException(nameof(displayFormat));

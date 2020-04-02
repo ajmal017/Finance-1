@@ -212,6 +212,18 @@ namespace Finance
         #endregion
         #region Simple Helpers
 
+        public static double Stdev(List<double> population)
+        {
+            var avg = population.Average();
+            double sumSquares = 0;
+            foreach (var val in population)
+            {
+                sumSquares += Math.Pow((val - avg), 2);
+            }
+
+            return Math.Sqrt(sumSquares / population.Count());
+        }
+
         public static T AddAndReturn<T>(this IList<T> me, T obj)
         {
             me.Add(obj);
@@ -681,7 +693,7 @@ namespace Finance
         /// <param name="me"></param>
         public static void InitializeMe(this object me)
         {
-
+            // Call the base Initializers
             foreach (MethodInfo method in me.GetType().BaseType.GetMethods(BindingFlags.NonPublic | BindingFlags.Instance))
             {
                 if (Attribute.IsDefined(method, typeof(InitializerAttribute)))
@@ -689,6 +701,8 @@ namespace Finance
                     method.Invoke(me, null);
                 }
             }
+
+            // Call the current Initializers
             foreach (MethodInfo method in me.GetType().GetMethods(BindingFlags.NonPublic | BindingFlags.Instance))
             {
                 if (Attribute.IsDefined(method, typeof(InitializerAttribute)))
@@ -708,16 +722,20 @@ namespace Finance
                 return Enum.GetName(me.GetType(), me);
         }
 
-        public static Enum ToEnumValue(this string me, Type enumType)
+        public static Enum EnumFromDescription(this string me, Type enumType)
         {
             var members = enumType.GetFields();
 
+            // Check based on Description
             foreach (var member in members)
             {
                 if (Attribute.IsDefined(member, typeof(DescriptionAttribute)) && member.GetCustomAttribute<DescriptionAttribute>().Description == me)
                     return member.GetValue(enumType) as Enum;
+                if (member.Name == me)
+                    return member.GetValue(enumType) as Enum;
             }
 
+            Console.WriteLine($"Could not parse enum value [{me}] to [{nameof(enumType)}]");
             return null;
         }
 
@@ -1266,7 +1284,7 @@ namespace Finance
             }
 
         }
-        
+
         public interface IPersistLayout
         {
             string Name { get; set; }
@@ -1277,6 +1295,19 @@ namespace Finance
 
             void SaveLayout();
             void LoadLayout();
+        }
+
+        public static Security MockSecurity()
+        {
+            return new Security("MOCK", SecurityType.CommonStock)
+            {
+                Sector = "Mock Sector",
+                Industry = "Mock Industry",
+                SicCode = 1234,
+                LastTrade = 12.34m,
+                LastBid = 12.3m,
+                LastAsk = 12.4m
+            };
         }
 
         #endregion

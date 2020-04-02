@@ -25,7 +25,7 @@ namespace Finance
             }
         }
 
-        Size _defaultSize = new Size(750, 500);
+        Size _defaultSize = new Size(750, 750);
 
         private SettingsManagerForm()
         {
@@ -43,6 +43,7 @@ namespace Finance
         TabPage pageDataSettings;
         TabPage pageLiveTradingSettings;
         TabPage pageTradingSettings;
+        TabPage pageRisk;
         TabPage pageTestingSettings;
         TabPage pageGlobalStyles;
         TabPage pageIndexDefaults;
@@ -61,7 +62,7 @@ namespace Finance
             tabSettingsGroups = new TabControl()
             {
                 Dock = DockStyle.Fill,
-                Appearance = TabAppearance.Normal
+                Appearance = TabAppearance.Normal                
             };
             this.Controls.Add(tabSettingsGroups);
         }
@@ -128,6 +129,14 @@ namespace Finance
             tabSettingsGroups.TabPages.Add(pageTradingSettings);
         }
         [Initializer]
+        private void InitializeRiskSettingsPage()
+        {
+            pageRisk = new TabPage("Risk");
+            pageRisk.BackColor = Color.Red;
+            pageRisk.Controls.Add(CreateSettingsTabPagePanel(SettingsType.LiveRisk));
+            tabSettingsGroups.TabPages.Add(pageRisk);
+        }
+        [Initializer]
         private void InitializeTestingSettingsPage()
         {
             pageTestingSettings = new TabPage("Testing Defaults");
@@ -184,7 +193,6 @@ namespace Finance
             {
                 Size = tabSettingsGroups.ClientRectangle.Size,
                 FlowDirection = FlowDirection.TopDown,
-                AutoScroll = true
             };
 
             var settings = Settings.GetSettingsByCategoryTag(settingsType);
@@ -288,6 +296,12 @@ namespace Finance
             //
             if (propertyType == typeof(Button))
                 ret.Controls.Add(PropertyControlButton(property, ret), 1, 0);
+            
+            //
+            // Decimal
+            //
+            if (propertyType == typeof(decimal))
+                ret.Controls.Add(PropertyControlDecimal(property, ret), 1, 0);
 
             return ret;
         }
@@ -300,6 +314,7 @@ namespace Finance
             // Create ComboBox
             //
             Type enumType = property.GetCustomAttribute<SettingsCategoryAttribute>().SettingsControlType;
+            
             var ctrl = new ComboBox()
             {
                 Size = _defaultComboBoxSize,
@@ -340,8 +355,7 @@ namespace Finance
             {
                 if (ctrl.SelectedIndex == -1)
                     return;
-
-                object val = Enum.Parse(enumType, (ctrl.SelectedItem as string).ToEnumValue(enumType).ToString());
+                object val = Enum.Parse(enumType, (ctrl.SelectedItem as string).EnumFromDescription(enumType).ToString());
                 property.SetValue(Settings.Instance, val);
 
                 panel.BackColor = Color.LawnGreen;
@@ -528,6 +542,70 @@ namespace Finance
 
             return ctrl;
         }
+        private TextBox PropertyControlDecimal(PropertyInfo property, TableLayoutPanel panel)
+        {
+            Size _defaultDecimalTextBoxSize = new Size(100, 20);
+
+            //
+            // Create TextBox
+            //
+            var ctrl = new TextBox()
+            {
+                Size = _defaultDecimalTextBoxSize,
+                Anchor = AnchorStyles.Right | AnchorStyles.Top | AnchorStyles.Bottom,
+                Margin = new Padding(0, 2, 15, 2),
+                TextAlign = HorizontalAlignment.Right
+            };
+
+            ctrl.Text = property.GetValue(Settings.Instance).ToString();
+
+            //
+            // Highlight effect on change showing that the setting was updated
+            //
+            Timer highlightTimer = new Timer() { Interval = 2000 };
+            highlightTimer.Tick += (s, e) =>
+            {
+                panel.BackColor = Panel.DefaultBackColor;
+                highlightTimer.Stop();
+            };
+
+            //
+            // Set the new value in Settings
+            //
+            bool valueChanged = false;
+            ctrl.TextChanged += (s, e) => valueChanged = true;
+            ctrl.KeyUp += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter)
+                    panel.Focus();
+            };
+            ctrl.Leave += (s, e) =>
+            {
+                if (!valueChanged)
+                    return;
+
+                if (decimal.TryParse(ctrl.Text, out decimal val))
+                {
+                    // Update settings value
+                    property.SetValue(Settings.Instance, val);
+                    panel.BackColor = Color.LawnGreen;                    
+                    valueChanged = false;
+                    panel.Focus();
+                }
+                else
+                {
+                    // Reset text to settings value
+                    ctrl.Text = property.GetValue(Settings.Instance).ToString();
+                    valueChanged = false;
+                    panel.BackColor = Color.PaleVioletRed;
+                    ctrl.SelectAll();
+                }
+                highlightTimer.Start();
+            };
+
+            return ctrl;
+        }
+
         private TextBox PropertyControlString(PropertyInfo property, TableLayoutPanel panel)
         {
             Size _defaultStringTextBoxSize = new Size(200, 20);

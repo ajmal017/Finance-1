@@ -587,127 +587,69 @@ namespace Finance
     }
 
     #endregion
-    #region IEX Message Status Display
+    #region MyRegion
 
-    //public class IexMessageStatusForm : Form, IPersistLayout
-    //{
-    //    private static IexMessageStatusForm _Instance { get; set; }
-    //    public static IexMessageStatusForm Instance
-    //    {
-    //        get
-    //        {
-    //            if (_Instance == null)
-    //                _Instance = new IexMessageStatusForm();
-    //            return _Instance;
-    //        }
-    //    }
+    public class ScramAlertIndicatorForm : Form
+    {
+        public static void ShowAlert()
+        {
+            _FormList.Clear();
+            foreach (Screen scr in Screen.AllScreens)
+            {
+                var f = _FormList.AddAndReturn(new ScramAlertIndicatorForm(scr));
+                f.Show();
+                f.formTimer.Start();
+            }
+        }
+        private static List<ScramAlertIndicatorForm> _FormList { get; set; } = new List<ScramAlertIndicatorForm>();
 
-    //    public bool Sizeable => false;
+        Label lblText;
+        string strAlertMsg = "SHUTDOWN INITIATED";
+        int _formHeight = 35;
+        Screen screen { get; }
+        Timer formTimer;
 
-    //    Size _defaultSize = new Size(350, 100);
+        private ScramAlertIndicatorForm(Screen screen)
+        {
+            this.screen = screen;
+            this.InitializeMe();
+        }
 
-    //    Label lblMessagesUsed;
-    //    Timer tmrUpdate;
+        [Initializer]
+        private void InitializeStyles()
+        {
+            FormBorderStyle = FormBorderStyle.None;
+            Height = _formHeight;
+            Width = Screen.FromControl(this).WorkingArea.Width;
+            Location = new Point(screen.WorkingArea.Left, 0);
+            BackColor = Color.Yellow;
+            ShowInTaskbar = false;
 
-    //    private IexMessageStatusForm()
-    //    {
-    //        Name = "IexMessages";
-    //        this.InitializeMe();
-    //        UpdateLabel();
+            lblText = new Label()
+            {
+                Text = strAlertMsg,
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font("Consolas", 16, FontStyle.Bold)
+            };
+            this.Controls.Add(lblText);
+        }
 
-    //        this.Shown += (s, e) => LoadLayout();
-    //        this.ResizeEnd += (s, e) => SaveLayout();
-    //    }
-
-    //    [Initializer]
-    //    private void InitializeStyles()
-    //    {
-    //        this.Size = _defaultSize;
-    //        this.Text = "IEX Message Limit";
-    //        this.FormBorderStyle = FormBorderStyle.FixedDialog;
-
-    //        lblMessagesUsed = new Label()
-    //        {
-    //            Dock = DockStyle.Fill,
-    //            Font = SystemFont(10, FontStyle.Bold),
-    //            TextAlign = ContentAlignment.MiddleCenter,
-    //            BackColor = Color.Black,
-    //            ForeColor = Color.Goldenrod
-    //        };
-    //        this.Controls.Add(lblMessagesUsed);
-    //    }
-
-    //    [Initializer]
-    //    private void InitializeUpdateHandler()
-    //    {
-    //        Settings.Instance.PropertyChanged += (s, e) =>
-    //        {
-    //            if (!this.Visible)
-    //                return;
-
-    //            //if (e.PropertyName == "IexMessageCount")
-    //            //{
-    //            //    Invoke(new Action(() => UpdateLabel()));
-    //            //}
-
-    //            if (e.PropertyName == "DataProvider")
-    //            {
-    //                ShowHide();
-    //            }
-    //            if (e.PropertyName == "IexCloudMode")
-    //            {
-    //                ShowHide();
-    //            }
-    //        };
-    //    }
-
-    //    [Initializer]
-    //    private void InitializeUpdateTimer()
-    //    {
-    //        tmrUpdate = new Timer()
-    //        {
-    //            Interval = 2000
-    //        };
-    //        tmrUpdate.Tick += (s, e) => UpdateLabel();
-    //    }
-
-    //    public void ShowHide()
-    //    {
-    //        if (Settings.Instance.RefDataProvider == DataProviderType.IEXCloud
-    //            && Settings.Instance.IexCloudMode == IexCloudMode.Production)
-    //        {
-    //            this.Show();
-    //            tmrUpdate.Start();
-    //        }
-    //        else
-    //        {
-    //            this.Hide();
-    //            tmrUpdate.Stop();
-    //        }
-    //    }
-
-    //    private void UpdateLabel()
-    //    {
-    //        if (InvokeRequired)
-    //        {
-    //            Invoke(new Action(() => UpdateLabel()));
-    //            return;
-    //        }
-
-    //        double percentUsed = 100 * (Settings.Instance.IexMessageCount.ToDouble() / Settings.Instance.IexMessageCountLimit.ToDouble());
-    //        string displayTxt = string.Format($@"Messages used: {Settings.Instance.IexMessageCount:###,###,##0} / {Settings.Instance.IexMessageCountLimit:###,###,###} ({percentUsed:0.00}%)");
-    //        lblMessagesUsed.Text = displayTxt;
-    //    }
-
-    //    public void SaveLayout()
-    //    {
-    //        Settings.Instance.SaveFormLayout(this);
-    //    }
-    //    public void LoadLayout()
-    //    {
-    //        Settings.Instance.LoadFormLayout(this);
-    //    }
-    //}
-
+        [Initializer]
+        private void InitializeFlashing()
+        {
+            formTimer = new Timer()
+            {
+                Interval = 1000
+            };
+            formTimer.Tick += (s, e) =>
+            {
+                Invoke(new Action(() =>
+                {
+                    lblText.Visible = !lblText.Visible;
+                }));
+            };
+        }
+    }
     #endregion
 };

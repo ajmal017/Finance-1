@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using IBApi;
+using System.Linq;
 using System.Threading;
 using static Finance.Helpers;
 using static Finance.Logger;
@@ -27,9 +28,9 @@ namespace Finance.Data
             ClientId = clientId;
             signal = new EReaderMonitorSignal();
             clientSocket = new EClientSocket(this, signal);
-        }
 
-        protected (int reqId, Security security)? ActiveStreamingQuote = null;
+            InitializeSnapshotTimer();
+        }
 
         #region Connection Management
 
@@ -52,7 +53,7 @@ namespace Finance.Data
 
         #endregion
 
-        #region ID Numbers
+        #region Streaming Quote Management
 
         //
         // ID used for identifying client requests (internal)
@@ -62,31 +63,32 @@ namespace Finance.Data
         {
             get
             {
-                _NextRequestId += 5;
+                _NextRequestId += 10;
                 return _NextRequestId;
             }
         }
 
-        private int SecurityId(int reqId)
+        private int GetBaseRequestId(Security security)
         {
-            return ((reqId / 5)) * 5;
-        }
-        private int GetActiveReqId(Security security)
-        {
-            if (ActiveStreamingQuote?.security != security)
-                return -1;
-            else
-                return ActiveStreamingQuote.Value.reqId;
+            if (ActiveQuotes.Exists(x => x.Security == security))
+                return ActiveQuotes.Find(x => x.Security == security).BaseReqId;
+
+            if (SnapShotQuotes.Exists(x => x.Security == security))
+                return SnapShotQuotes.Find(x => x.Security == security).BaseReqId;
+
+            return -1;
         }
         protected Security GetRequestSecurity(int reqId)
         {
-            //var security = ActiveStreamingQuotes.SingleOrDefault(x => x.Value.reqId == SecurityId(reqId))?.security;
-            if (ActiveStreamingQuote == null || (reqId - (reqId % 5) != ActiveStreamingQuote.Value.reqId))
-                return null;
-            else
-            {
-                return ActiveStreamingQuote?.security;
-            }
+            var baseId = (reqId - (reqId % 10));
+
+            if (ActiveQuotes.Exists(x => x.BaseReqId == baseId))
+                return ActiveQuotes.Find(x => x.BaseReqId == baseId).Security;
+
+            if (SnapShotQuotes.Exists(x => x.BaseReqId == baseId))
+                return SnapShotQuotes.Find(x => x.BaseReqId == baseId).Security;
+
+            return null;
         }
 
         private enum IbkrLiveDataRequestType
@@ -98,24 +100,107 @@ namespace Finance.Data
             StreamLastTrades = 4
         }
 
+        //protected (int reqId, Security security)? ActiveStreamingQuote = null;
+
+        private class ActiveQuote
+        {
+            public Security Security { get; set; }
+            public int BaseReqId { get; set; }
+            public DateTime LastRequest { get; set; }
+        }
+
+        private int MaxOpenStreams => 3;
+        private List<ActiveQuote> ActiveQuotes = new List<ActiveQuote>();
+        private List<ActiveQuote> SnapShotQuotes = new List<ActiveQuote>();
+
+        private System.Windows.Forms.Timer tmrSnapshot;
+
+        private void InitializeSnapshotTimer()
+        {
+            tmrSnapshot = new System.Windows.Forms.Timer()
+            {
+                Interval = 5000
+            };
+            tmrSnapshot.Tick += (s, e) =>
+            {
+                var secs = (from req in SnapShotQuotes select req.Security).ToList();
+                foreach (var sec in secs)
+                {
+                    RequestSnapshotQuotes(sec);
+                }
+            };
+           // tmrSnapshot.Start();
+        }
+
         #endregion
 
-        public override void RequestStreamingQuotes(Security security)
+        private int CancelOldestStream()
+        {
+            ActiveQuotes.Sort((x, y) => x.LastRequest.CompareTo(y.LastRequest));
+            ActiveQuote oldest = ActiveQuotes.FirstOrDefault();
+            if (oldest != null)
+            {
+                CancelStreamingQuotes(oldest.Security);
+                ActiveQuotes.Remove(oldest);
+            }
+
+            return ActiveQuotes.Count;
+        }
+
+
+        public override void RequestSnapshotQuotes(Security security)
         {
             if (security == null)
                 return;
 
-            if (ActiveStreamingQuote?.security == security)
-                return;
-
-            Console.WriteLine("Submitting RTB request");
-
-            if (ActiveStreamingQuote.HasValue)
-                CancelStreamingQuotes(ActiveStreamingQuote?.security);
+            if (SnapShotQuotes.Exists(x => x.Security == security))
+            {
+                SnapShotQuotes.RemoveAll(x => x.Security == security);
+            }
 
             var reqId = NextRequestId;
+            SnapShotQuotes.Add(new ActiveQuote()
+            {
+                Security = security,
+                BaseReqId = reqId,
+                LastRequest = DateTime.Now
+            });
 
-            ActiveStreamingQuote = (reqId, security);
+            var lastCloseDate = DateTime.Today;
+            if (!Calendar.IsTradingDay(lastCloseDate))
+                lastCloseDate = Calendar.PriorTradingDay(lastCloseDate).AddHours(23);
+
+            // Request historical data for last close
+            clientSocket.reqHistoricalData(reqId + IbkrLiveDataRequestType.LastClose.ToInt(),
+                security.GetContract(), lastCloseDate.ToIbkrFormat(), "1 D", "1 day", "TRADES", 1, 2, false, null);
+
+            // Request historical data for intraday minutes
+            clientSocket.reqHistoricalData(reqId + IbkrLiveDataRequestType.TodayIntradayMinutes.ToInt(),
+                security.GetContract(), DateTime.Now.ToIbkrFormat(), "1 D", "1 min", "TRADES", 1, 2, false, null);
+
+            // Request intraday minute updates
+            clientSocket.reqHistoricalData(reqId + IbkrLiveDataRequestType.StreamIntradayMinutesUpdates.ToInt(),
+                security.GetContract(), "", "1 D", "1 min", "TRADES", 1, 2, true, null);
+        }
+        public override void RequestStreamingQuotes(Security security)
+        {
+            if (security == null || ActiveQuotes.Exists(x => x.Security == security))
+                return;
+
+            if (ActiveQuotes.Count == MaxOpenStreams &&
+                CancelOldestStream() == MaxOpenStreams)
+            {
+                Log(new LogMessage("Live Data", "Max open streams limit reached, cannot request data", LogMessageType.Production));
+                return;
+            }
+
+            var reqId = NextRequestId;
+            ActiveQuotes.Add(new ActiveQuote()
+            {
+                Security = security,
+                BaseReqId = reqId,
+                LastRequest = DateTime.Now
+            });
 
             var lastCloseDate = DateTime.Today;
             if (!Calendar.IsTradingDay(lastCloseDate))
@@ -146,22 +231,17 @@ namespace Finance.Data
             if (security == null)
                 return;
 
-            int reqId = GetActiveReqId(security);
+            int reqId = GetBaseRequestId(security);
 
-            for (int i = reqId; i < reqId + 5; i++)
+            for (int i = reqId; i < reqId + Enum.GetValues(typeof(IbkrLiveDataRequestType)).Length; i++)
             {
                 clientSocket.cancelTickByTickData(i);
-                Thread.Sleep(20);
+                Thread.Sleep(25);
                 clientSocket.cancelHistoricalData(i);
-                Thread.Sleep(20);
+                Thread.Sleep(25);
                 clientSocket.cancelMktData(i);
-                Thread.Sleep(20);
+                Thread.Sleep(25);
             }
-        }
-        private void CancelAllStreamingQuotes()
-        {
-            CancelStreamingQuotes(ActiveStreamingQuote?.security);
-            ActiveStreamingQuote = null;
         }
 
         #region System
@@ -229,6 +309,7 @@ namespace Finance.Data
                     catch (Exception ex)
                     {
                         Console.WriteLine($"Exception in reader thread: {ex.Message}");
+                        throw ex;
                     }
                 })
                 {
@@ -285,6 +366,8 @@ namespace Finance.Data
 
             DateTime dt = time.FromIbkrTimeFormat();
 
+            security.LastTrade = price.ToDecimal();
+
             OnLiveQuoteReceived(security, LiveQuoteType.Trade, dt, price.ToDecimal(), size);
         }
         public void historicalTicksBidAsk(int reqId, HistoricalTickBidAsk[] ticks, bool done)
@@ -301,20 +384,26 @@ namespace Finance.Data
             if (security == null)
                 return;
 
-            if (reqId % 5 == 0)
+            if (reqId % 10 == 0)
             {
                 // Last Close Bar
                 var Close = bar.Close;
                 var Time = bar.Time.FromIbkrFormat();
+
+                security.LastClose = Close.ToDecimal();
+
                 OnLiveQuoteReceived(security, LiveQuoteType.Open, Time, Close.ToDecimal(), 0);
             }
-            else if (reqId % 5 == 1)
+            else if (reqId % 10 == 1)
             {
                 // Intraday minute bar populate
                 DateTime d = long.Parse(bar.Time).FromIbkrTimeFormat();
 
-                if (d.Day != DateTime.Today.Day)
+                if (d.Day != Calendar.CurrentOrPriorTradingDay(DateTime.Today).Day)
                     return;
+
+                if (d.TimeOfDay == new TimeSpan(14, 59, 0))
+                    Console.WriteLine();
 
                 TimeSpan dt = long.Parse(bar.Time).FromIbkrTimeFormat().TimeOfDay;
                 security.AddIntradayTick(dt, bar.Close.ToDecimal(), true);
@@ -323,7 +412,7 @@ namespace Finance.Data
         }
         public void historicalDataEnd(int reqId, string start, string end)
         {
-            if (reqId % 5 == 1)
+            if (reqId % 10 == 1)
             {
                 // End of intraday minute populate
 
@@ -337,7 +426,7 @@ namespace Finance.Data
         }
         public void historicalDataUpdate(int reqId, Bar bar)
         {
-            if (reqId % 5 == 2)
+            if (reqId % 10 == 2)
             {
                 var security = GetRequestSecurity(reqId);
                 // Intraday minute bar update
@@ -347,6 +436,15 @@ namespace Finance.Data
 
                 var dt = long.Parse(bar.Time).FromIbkrTimeFormat();
                 security.AddIntradayTick(dt.TimeOfDay, bar.Close.ToDecimal(), false);
+
+                if(security.Ticker == "MSFT")
+                    Console.WriteLine();
+
+                if (!ActiveQuotes.Exists(x => x.Security == security))
+                {
+                    security.LastTrade = bar.Close.ToDecimal();
+                    OnLiveQuoteReceived(security, LiveQuoteType.Trade, DateTime.Now, bar.Close.ToDecimal(), bar.Volume);
+                }
             }
         }
 

@@ -1490,6 +1490,7 @@ namespace Finance
         {
             Points.Clear();
 
+
             foreach (PriceBar bar in Security.GetPriceBars(PriceBarSize))
             {
                 var pt = new DataPoint(this)
@@ -1500,7 +1501,6 @@ namespace Finance
                     Tag = bar,
                     Color = (bar.Change >= 0 ? Color.Green : Color.Red)
                 };
-
                 Points.Add(pt);
             }
         }

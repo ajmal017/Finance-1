@@ -516,6 +516,11 @@ namespace Finance
             return PriorTradingDay(NextTradingWeekStart(date));
         }
 
+        public static DateTime CurrentOrPriorTradingDay(DateTime date)
+        {
+            return (IsTradingDay(date) ? date : PriorTradingDay(date));
+        }
+
         public static List<DateTime> AllHolidays(DateTime start, DateTime end)
         {
             List<DateTime> ret = new List<DateTime>();
@@ -531,6 +536,34 @@ namespace Finance
             }
 
             return ret;
+        }
+
+        public static PriceBar GetContainingBar(PriceBar smallerPriceBar, List<PriceBar> largerPriceBars)
+        {
+            PriceBarSize smallerBarType = smallerPriceBar.BarSize;
+            PriceBarSize largerBarSize = largerPriceBars.FirstOrDefault().BarSize;
+
+            if (smallerBarType.ToInt() > largerBarSize.ToInt())
+                throw new UnknownErrorException();
+
+            // Convert the smaller bar date time to the start date of the larger bar
+            switch (largerBarSize)
+            {
+                case PriceBarSize.Daily:
+                    return smallerPriceBar;
+                case PriceBarSize.Weekly:
+                    var newWeekDate = Calendar.FirstTradingDayOfWeek(smallerPriceBar.BarDateTime);
+                    return largerPriceBars.SingleOrDefault(x => x.BarDateTime == newWeekDate);
+                case PriceBarSize.Monthly:
+                    var newMonthDate = Calendar.FirstTradingDayOfMonth(smallerPriceBar.BarDateTime);
+                    return largerPriceBars.SingleOrDefault(x => x.BarDateTime == newMonthDate);
+                case PriceBarSize.Quarterly:
+                    var newQuarterDate = Calendar.FirstTradingDayOfQuarter(smallerPriceBar.BarDateTime);
+                    return largerPriceBars.SingleOrDefault(x => x.BarDateTime == newQuarterDate);
+                default:
+                    break;
+            }
+            return null;
         }
     }
 

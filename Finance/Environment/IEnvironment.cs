@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Finance.LiveTrading;
 using static Finance.Helpers;
 
 namespace Finance
@@ -75,6 +76,7 @@ namespace Finance
         decimal RegTEndOfDayMargin(Position pos, DateTime AsOf, TimeOfDay MarketValues);
 
         decimal CommissionCharged(Trade trd, bool API = false);
+        decimal CommissionCharged(LiveOrder order);
         decimal CommissionCharged(List<Trade> trds, bool API = false);
 
         /// <summary>
@@ -93,6 +95,7 @@ namespace Finance
         decimal SlippageAdjustedPrice(decimal Price, TradeActionBuySell tradeAction);
 
     }
+
     public class IbkrEnvironment : IEnvironment
     {
         public decimal RegTEndOfDayInitialMargin { get; set; } = .50m;
@@ -138,6 +141,31 @@ namespace Finance
 
                 // Maximum of .5% of trade value
                 ret = Math.Min(ret, Math.Abs(.005m * trd.TotalCashImpact));
+
+                return -ret;
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"EXCEPTION:{GetCurrentMethod()}  {ex.Message}");
+                return 0;
+            }
+        }
+        public decimal CommissionCharged(LiveOrder order)
+        {            
+            try
+            {
+                var perShare = .005m;
+                if (ApiTrading)
+                    perShare = .0075m;
+
+                var ret = perShare * Math.Abs(order.OrderSize);
+
+                // Minimum of $1.00 per trade
+                ret = Math.Max(ret, 1.00m);
+
+                // Maximum of .5% of trade value
+                ret = Math.Min(ret, Math.Abs(.005m * order.TotalMoney));
 
                 return -ret;
 

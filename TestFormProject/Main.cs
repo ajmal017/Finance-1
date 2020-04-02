@@ -9,6 +9,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices;
+using System.Diagnostics;
 using static Finance.Logger;
 using static Finance.Helpers;
 
@@ -51,8 +52,9 @@ namespace TestFormProject
                 if (SystemLogForm != null)
                     SystemLogForm.Close();
             };
+
             bool focusFlag = true;
-            this.GotFocus += (s, e) =>
+            this.Activated += (s, e) =>
             {
                 if (focusFlag)
                 {
@@ -67,7 +69,6 @@ namespace TestFormProject
                 else
                     focusFlag = true;
             };
-
         }
         [Initializer]
         private void InitializeEventManager()
@@ -84,15 +85,10 @@ namespace TestFormProject
 
             menuShowSettings.Click += (s, e) => SettingsManagerForm.Instance.Show();
 
-            menuShowTradeManager.Click += (s, e) => TradingAccountManagerForm.Instance.Show();
+            menuShowTradeManager.Click += (s, e) => LiveTradingManagerForm.Instance.Show();
 
-        }
-        [Initializer]
-        private void InitializeProviderMonitors()
-        {
-            pnlProviderMonitors.Controls.Add(new ProviderStatusPanel(RefDataManager.Instance));
-            pnlProviderMonitors.Controls.Add(new ProviderStatusPanel(LiveDataProvider.Instance));
-            pnlProviderMonitors.Controls.Add(new ProviderStatusPanel(TradingAccountProvider.Instance));
+            menuCalculator.Click += (s, e) => Process.Start("calc");
+
         }
         [Initializer]
         private void InitializeLogger()
@@ -106,6 +102,13 @@ namespace TestFormProject
             };
             SystemLogForm = new LogOutputForm(msgs.ToList(), "System Log");
             SystemLogForm.Show();
+        }
+        [Initializer]
+        private void InitializeProviderMonitors()
+        {
+            pnlProviderMonitors.Controls.Add(new ProviderStatusPanel(RefDataManager.Instance));
+            pnlProviderMonitors.Controls.Add(new ProviderStatusPanel(LiveDataProvider.Instance));
+            pnlProviderMonitors.Controls.Add(new ProviderStatusPanel(LiveTradingProvider.Instance));
         }
         [Initializer]
         private void InitializeSystemModeIndicator()
@@ -127,12 +130,27 @@ namespace TestFormProject
             //
             // Trading Manager
             //
-            TradingAccountManagerForm.Instance.Show();
+            LiveTradingManagerForm.Instance.Show();
 
             //
             // Live Security Quote Screen
             //
             LiveQuoteForm.Instance.Show();
+
+            //
+            // Trade Entry Form
+            //
+            LiveTradeEntryForm.Instance.Show();
+
+            //
+            // Single Security Indicators
+            //
+            SingleSecurityIndicatorForm.Instance.Show();
+
+            //
+            // SCRAM
+            //
+            SCRAM.Instance.Show();
         }
 
         public void SaveLayout()

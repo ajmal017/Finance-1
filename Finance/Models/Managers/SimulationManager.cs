@@ -28,48 +28,16 @@ namespace Finance
         public event SimulationStatusEventHandler SimulationStatusChanged;
         private void OnSimulationStatusChanged(Simulation simulation)
         {
-            SetStatusIndicator(ControlStatus.Ready);
             SimulationStatusChanged?.Invoke(this, new SimulationStatusEventArgs(simulation));
         }
 
         #endregion
-        #region Status Indicator
-
-        StatusLabelControlManager StatusIndicatorControlManager { get; } = null;
-        private void SetStatusIndicator(ControlStatus processStatus)
-        {
-            //lastStatus = processStatus;
-
-            switch (processStatus)
-            {
-                case ControlStatus.ErrorState:
-                    StatusIndicatorControlManager?.SetStatus("Error State", Color.PaleVioletRed);
-                    break;
-                case ControlStatus.Ready:
-                    if (Simulations.Any(x => x.SimulationStatus == SimulationStatus.Running))
-                        SetStatusIndicator(ControlStatus.Working);
-                    else
-                        StatusIndicatorControlManager?.SetStatus("Ready", Color.LightGreen);
-                    break;
-                case ControlStatus.Working:
-                    StatusIndicatorControlManager?.SetStatus($"Running {Simulations.Where(x => x.SimulationStatus == SimulationStatus.Running).Count()} Simulations...", Color.Orange);
-                    break;
-                case ControlStatus.Offline:
-                    StatusIndicatorControlManager?.SetStatus("Offline", Color.PaleVioletRed);
-                    break;
-            }
-        }
-        public Control StatusIndicator => StatusIndicatorControlManager.IssueControl();
-
-        #endregion
-
+     
         public BindingList<Simulation> Simulations { get; private set; } = new BindingList<Simulation>();
         public int SimulationCount { get => Simulations.Count; }
 
         private SimulationManager()
         {
-            StatusIndicatorControlManager = new StatusLabelControlManager("SimulationManager");
-            SetStatusIndicator(ControlStatus.Ready);
         }
 
         public Simulation CreateSimulation(string Name)

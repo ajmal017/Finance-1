@@ -388,7 +388,7 @@ namespace Finance
             if (this.Security == null || Security.DataUpToDate)
                 return;
 
-            RefDataManager.Instance.UpdateSecurityPriceData(Security, DateTime.Today, false);
+            RefDataManager.Instance.UpdateSecurityPriceData(Security, DateTime.Today);
             btnUpdateSecurity.Enabled = false;
             btnUpdateSecurity.Text = "Updating...";
         }

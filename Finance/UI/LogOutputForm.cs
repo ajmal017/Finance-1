@@ -37,6 +37,8 @@ namespace Finance
             else
                 DisplayTypes = displayTypes;
 
+            DisplayTypes.Add(LogMessageType.SCRAM);
+
             this.InitializeMe();
 
             // Subscribe to static log event
@@ -170,6 +172,17 @@ namespace Finance
                 case LogMessageType.TradingSystemMessage:
                     txtOutput.SelectionColor = Color.White;
                     txtOutput.AppendText("[TRD] ");
+                    break;
+                case LogMessageType.TradeWarning:
+                    txtOutput.SelectionColor = Color.Gray;
+                    txtOutput.SelectionBackColor = Color.Yellow;
+                    txtOutput.AppendText("[TRD] ");
+                    break;
+
+                case LogMessageType.SCRAM:
+                    txtOutput.SelectionBackColor = Color.Yellow;
+                    txtOutput.SelectionColor = Color.DarkRed;
+                    txtOutput.AppendText("[A35] ");
                     break;
                 default:
                     break;

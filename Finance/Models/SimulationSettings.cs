@@ -487,7 +487,7 @@ namespace Finance
 
                 string enumString = (ctrl.SelectedItem as string);
 
-                object val = Enum.Parse(enumType, enumString.ToEnumValue(enumType)?.ToString() ?? enumString);
+                object val = Enum.Parse(enumType, enumString.EnumFromDescription(enumType)?.ToString() ?? enumString);
                 property.SetValue(source, val);
 
                 panel.BackColor = Color.LawnGreen;

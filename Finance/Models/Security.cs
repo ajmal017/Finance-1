@@ -71,10 +71,72 @@ namespace Finance
 
         #region Live Pricing Data
 
+        private decimal _LastBid { get; set; }
         [NotMapped]
-        public decimal LastBid { get; set; }
+        public decimal LastBid
+        {
+            get => _LastBid;
+            set
+            {
+                if (_LastBid != value)
+                {
+                    _LastBid = value;
+                    OnPropertyChanged("LastBid");
+                }
+            }
+        }
+
+        private decimal _LastAsk { get; set; }
         [NotMapped]
-        public decimal LastAsk { get; set; }
+        public decimal LastAsk
+        {
+            get => _LastAsk;
+            set
+            {
+                if (_LastAsk != value)
+                {
+                    _LastAsk = value;
+                    OnPropertyChanged("LastAsk");
+                }
+            }
+        }
+
+        private decimal _LastTrade { get; set; }
+        [NotMapped]
+        public decimal LastTrade
+        {
+            get
+            {
+                if (_LastTrade == 0)
+                    return LastIntradayTick.lastTick;
+                else
+                    return _LastTrade;
+            }
+
+            set
+            {
+                if (_LastTrade != value)
+                {
+                    _LastTrade = value;
+                    OnPropertyChanged("LastTrade");
+                }
+            }
+        }
+
+        private decimal _LastClose { get; set; }
+        [NotMapped]
+        public decimal LastClose
+        {
+            get => _LastClose;
+            set
+            {
+                if (_LastClose != value)
+                {
+                    _LastClose = value;
+                    OnPropertyChanged("LastClose");
+                }
+            }
+        }
 
         [NotMapped]
         public List<(TimeSpan time, decimal lastTick)> IntradayTicks { get; set; } = new List<(TimeSpan time, decimal lastTick)>();
@@ -92,7 +154,19 @@ namespace Finance
         {
             OnPropertyChanged("IntradayTicks");
         }
-        
+
+        [NotMapped]
+        public (TimeSpan time, decimal lastTick) LastIntradayTick
+        {
+            get
+            {
+                if (IntradayTicks.Count == 0)
+                    return (new TimeSpan(0, 0, 0), 0);
+                IntradayTicks.Sort((x, y) => x.time.CompareTo(y.time));
+                return IntradayTicks.Last();
+            }
+        }
+
         #endregion
         #region Custom Tags
 
