@@ -938,7 +938,7 @@ namespace Finance.LiveTrading
         {
             txtStopPrice.ValueChanged += (s, e) =>
             {
-                StopPrice = txtStopPrice.Value;
+                StopPrice = Math.Round(txtStopPrice.Value, 2);
 
                 if (!ignoreValueChange)
                 {
@@ -950,7 +950,7 @@ namespace Finance.LiveTrading
             };
             txtStopAtrMult.ValueChanged += (s, e) =>
             {
-                StopAtrMult = txtStopAtrMult.Value;
+                StopAtrMult = Math.Round(txtStopAtrMult.Value, 2);
 
                 if (!ignoreValueChange && Security != null)
                 {
@@ -1164,6 +1164,17 @@ namespace Finance.LiveTrading
             SecurityManagerForm.Instance.SelectedSecurityChanged += (s, e) =>
             {
                 SetActiveSecurity(e.SelectedSecurity);
+            };
+            LiveTradingManager.Instance.ActiveAccountChanged += (s, e) =>
+            {
+                if (Account != e.Account)
+                {
+                    Account = e.Account;
+                    Account.PropertyChanged += (ss, ee) =>
+                    {
+                        Invoke(new Action(() => UpdateAccountDisplay()));
+                    };
+                }
             };
         }
 
@@ -1404,25 +1415,6 @@ namespace Finance.LiveTrading
 
             OnActiveSecurityChanged();
         }
-        public void SetActiveAccount(LiveAccount account)
-        {
-            if (InvokeRequired)
-            {
-                Invoke(new Action(() =>
-                {
-                    SetActiveAccount(account);
-                    return;
-                }));
-            }
-
-            if (this.Account == account)
-                return;
-
-            this.Account = account;
-            account.PropertyChanged += (s, e) => UpdateAccountDisplay();
-
-            UpdateAccountDisplay();
-        }
 
         private void ApproveTrade()
         {
@@ -1451,7 +1443,7 @@ namespace Finance.LiveTrading
 
             if (AutoRiskManagement && (Trade == null || StoplossTrade == null))
                 throw new TradingSystemException() { message = "Trade or Stoploss null" };
-            else if(Trade == null)
+            else if (Trade == null)
                 throw new TradingSystemException() { message = "Trade is null" };
 
             if (LiveTradingManager.Instance.ExecuteTrades(this.Trade, this.StoplossTrade) == true)

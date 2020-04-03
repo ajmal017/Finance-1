@@ -82,10 +82,10 @@ namespace Finance.LiveTrading
             this.boxAccountSelect = new System.Windows.Forms.ToolStripComboBox();
             this.tabMainPanel = new System.Windows.Forms.TabControl();
             this.tabAccount = new System.Windows.Forms.TabPage();
-            this.pnlAccountDisplay = new Finance.LiveAccountSummaryPanel();
             this.tabPositions = new System.Windows.Forms.TabPage();
             this.pnlPositionsMain = new System.Windows.Forms.Panel();
             this.pnlPositionsSummaryMain = new System.Windows.Forms.Panel();
+            this.pnlAccountDisplay = new Finance.LiveAccountSummaryPanel();
             this.menuStrip1.SuspendLayout();
             this.statusStrip1.SuspendLayout();
             this.tabMainPanel.SuspendLayout();
@@ -138,7 +138,7 @@ namespace Finance.LiveTrading
             this.statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.lblProviderConnection,
             this.btnAccountSelect});
-            this.statusStrip1.Location = new System.Drawing.Point(0, 515);
+            this.statusStrip1.Location = new System.Drawing.Point(0, 400);
             this.statusStrip1.Name = "statusStrip1";
             this.statusStrip1.Size = new System.Drawing.Size(1082, 22);
             this.statusStrip1.TabIndex = 1;
@@ -174,7 +174,7 @@ namespace Finance.LiveTrading
             this.tabMainPanel.Location = new System.Drawing.Point(0, 24);
             this.tabMainPanel.Name = "tabMainPanel";
             this.tabMainPanel.SelectedIndex = 0;
-            this.tabMainPanel.Size = new System.Drawing.Size(1082, 491);
+            this.tabMainPanel.Size = new System.Drawing.Size(1082, 376);
             this.tabMainPanel.TabIndex = 2;
             // 
             // tabAccount
@@ -182,17 +182,10 @@ namespace Finance.LiveTrading
             this.tabAccount.Controls.Add(this.pnlAccountDisplay);
             this.tabAccount.Location = new System.Drawing.Point(4, 22);
             this.tabAccount.Name = "tabAccount";
-            this.tabAccount.Size = new System.Drawing.Size(1074, 465);
+            this.tabAccount.Size = new System.Drawing.Size(1074, 350);
             this.tabAccount.TabIndex = 0;
             this.tabAccount.Text = "Account";
             this.tabAccount.UseVisualStyleBackColor = true;
-            // 
-            // pnlAccountDisplay
-            // 
-            this.pnlAccountDisplay.Location = new System.Drawing.Point(8, 3);
-            this.pnlAccountDisplay.Name = "pnlAccountDisplay";
-            this.pnlAccountDisplay.Size = new System.Drawing.Size(301, 459);
-            this.pnlAccountDisplay.TabIndex = 0;
             // 
             // tabPositions
             // 
@@ -200,7 +193,7 @@ namespace Finance.LiveTrading
             this.tabPositions.Location = new System.Drawing.Point(4, 22);
             this.tabPositions.Name = "tabPositions";
             this.tabPositions.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPositions.Size = new System.Drawing.Size(1074, 465);
+            this.tabPositions.Size = new System.Drawing.Size(1074, 350);
             this.tabPositions.TabIndex = 1;
             this.tabPositions.Text = "Positions";
             this.tabPositions.UseVisualStyleBackColor = true;
@@ -211,7 +204,7 @@ namespace Finance.LiveTrading
             this.pnlPositionsMain.Dock = System.Windows.Forms.DockStyle.Fill;
             this.pnlPositionsMain.Location = new System.Drawing.Point(3, 3);
             this.pnlPositionsMain.Name = "pnlPositionsMain";
-            this.pnlPositionsMain.Size = new System.Drawing.Size(1068, 459);
+            this.pnlPositionsMain.Size = new System.Drawing.Size(1068, 344);
             this.pnlPositionsMain.TabIndex = 0;
             // 
             // pnlPositionsSummaryMain
@@ -222,9 +215,16 @@ namespace Finance.LiveTrading
             this.pnlPositionsSummaryMain.Size = new System.Drawing.Size(1068, 360);
             this.pnlPositionsSummaryMain.TabIndex = 0;
             // 
+            // pnlAccountDisplay
+            // 
+            this.pnlAccountDisplay.Location = new System.Drawing.Point(8, 3);
+            this.pnlAccountDisplay.Name = "pnlAccountDisplay";
+            this.pnlAccountDisplay.Size = new System.Drawing.Size(301, 459);
+            this.pnlAccountDisplay.TabIndex = 0;
+            // 
             // LiveTradingManagerForm
             // 
-            this.ClientSize = new System.Drawing.Size(1082, 537);
+            this.ClientSize = new System.Drawing.Size(1082, 422);
             this.Controls.Add(this.tabMainPanel);
             this.Controls.Add(this.statusStrip1);
             this.Controls.Add(this.menuStrip1);

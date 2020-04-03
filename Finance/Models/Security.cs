@@ -108,7 +108,7 @@ namespace Finance
             get
             {
                 if (_LastTrade == 0)
-                    return LastIntradayTick.lastTick;
+                    return LastIntradayMinute?.Close ?? 0;
                 else
                     return _LastTrade;
             }
@@ -139,32 +139,52 @@ namespace Finance
         }
 
         [NotMapped]
-        public List<(TimeSpan time, decimal lastTick)> IntradayTicks { get; set; } = new List<(TimeSpan time, decimal lastTick)>();
-        public void AddIntradayTick(TimeSpan time, decimal lastTick, bool initialPopulate)
-        {
-            if (IntradayTicks.Exists(x => x.time == time))
-                IntradayTicks.RemoveAll(x => x.time == time);
-
-            IntradayTicks.Add((time, lastTick));
-
-            if (!initialPopulate)
-                OnPropertyChanged("IntradayTicks");
-        }
-        public void IntradayTickInitialPopulateComplete()
-        {
-            OnPropertyChanged("IntradayTicks");
-        }
-
+        public List<PriceBar> IntradayMinuteBars { get; protected set; } = new List<PriceBar>();
         [NotMapped]
-        public (TimeSpan time, decimal lastTick) LastIntradayTick
+        public PriceBar LastIntradayMinute => IntradayMinuteBars.LastOrDefault();
+        [NotMapped]
+        public PriceBar FirstIntradayMinute => IntradayMinuteBars.FirstOrDefault();
+        [NotMapped]
+        public PriceBar IntradayBar
         {
             get
             {
-                if (IntradayTicks.Count == 0)
-                    return (new TimeSpan(0, 0, 0), 0);
-                IntradayTicks.Sort((x, y) => x.time.CompareTo(y.time));
-                return IntradayTicks.Last();
+                if (IntradayMinuteBars.Count == 0)
+                    return null;
+
+                var ret = new PriceBar(FirstIntradayMinute.BarDateTime, this);
+
+                var open = FirstIntradayMinute.Open;
+                var close = LastIntradayMinute.Close;
+                var high = IntradayMinuteBars.Max(x => x.High);
+                var low = IntradayMinuteBars.Min(x => x.Low);
+                var vol = IntradayMinuteBars.Sum(x => x.Volume);
+
+                ret.SetPriceValues(open, high, low, close,vol);
+
+                return ret;
             }
+        }
+
+        public void AddIntradayMinuteBar(DateTime barDateTime, decimal open, decimal high, decimal low, decimal close, long volume, bool initialPopulate)
+        {
+            PriceBar newMinuteBar = new PriceBar(barDateTime, this)
+            {
+                Open = open,
+                High = high,
+                Low = low,
+                Close = close,
+                Volume = volume
+            };
+            IntradayMinuteBars.Add(newMinuteBar);
+            IntradayMinuteBars.Sort((x, y) => x.BarDateTime.CompareTo(y.BarDateTime));
+
+            if (!initialPopulate)
+                OnPropertyChanged(nameof(this.IntradayMinuteBars));
+        }
+        public void IntradayMinuteInitialPopulateComplete()
+        {
+            OnPropertyChanged(nameof(this.IntradayMinuteBars));
         }
 
         #endregion

@@ -181,15 +181,25 @@ namespace Finance
                 SelectedSecurity = securityGrid.SelectedRows[0].DataBoundItem as Security;
             };
 
+            securityGrid.CellDoubleClick += (s, e) =>
+            {
+                LiveQuoteForm.Instance?.SetActiveSecurity(this.SelectedSecurity);
+                LiveTradeEntryForm.Instance?.SetActiveSecurity(this.SelectedSecurity);
+                SingleSecurityIndicatorForm.Instance?.SetSecurity(this.SelectedSecurity);
+            };
         }
 
         public void LoadSecurityList()
         {
-            bindingSource = new BindingSource();
-            bindingSource.DataSource = RefDataManager.Instance.GetAllSecurities();
-            securityGrid.DataSource = bindingSource;
+            Invoke(new Action(() =>
+            {
+                bindingSource = new BindingSource();
+                bindingSource.DataSource = RefDataManager.Instance.GetAllSecurities();
+                securityGrid.DataSource = bindingSource;
 
-            securityGrid.CellFormatting += SecurityGrid_CellFormatting;
+                securityGrid.CellFormatting += SecurityGrid_CellFormatting;
+            }));
+
         }
 
         private void SecurityGrid_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
@@ -214,20 +224,23 @@ namespace Finance
 
         public void FilterSecurityList(SecurityFilter filter)
         {
-            SuspendLayout();
+            Invoke(new Action(() =>
+            {
+                SuspendLayout();
 
-            bindingSource.DataSource =
-                RefDataManager.Instance.GetAllSecurities().
-                Where(sec => filter.IndustryFilters.Contains(sec.Industry)).
-                Where(sec => filter.SectorFilters.Contains(sec.Sector)).
-                Where(sec => filter.SicFilters.Contains(sec.SicCode)).
-                Where(sec => filter.TypeFilters.Contains(sec.SecurityType)).
-                Where(sec => filter.ExcludeMissingData ? !sec.MissingData : true).
-                Where(sec => filter.FavoritesOnly ? sec.Favorite : true).
-                Where(sec => filter.ExcludeZeroVolume ? !sec.ZeroVolume : true).
-                Where(sec => filter.CurrentTrendFilters.Contains(sec.LastTrend()));
+                bindingSource.DataSource =
+                    RefDataManager.Instance.GetAllSecurities().
+                    Where(sec => filter.IndustryFilters.Contains(sec.Industry)).
+                    Where(sec => filter.SectorFilters.Contains(sec.Sector)).
+                    Where(sec => filter.SicFilters.Contains(sec.SicCode)).
+                    Where(sec => filter.TypeFilters.Contains(sec.SecurityType)).
+                    Where(sec => filter.ExcludeMissingData ? !sec.MissingData : true).
+                    Where(sec => filter.FavoritesOnly ? sec.Favorite : true).
+                    Where(sec => filter.ExcludeZeroVolume ? !sec.ZeroVolume : true).
+                    Where(sec => filter.CurrentTrendFilters.Contains(sec.LastTrend()));
 
-            ResumeLayout();
+                ResumeLayout();
+            }));
         }
 
     }
@@ -1977,11 +1990,11 @@ namespace Finance
                 if (this.Security != s as Security)
                     return;
 
-                if (e.PropertyName == "IntradayTicks")
+                if (e.PropertyName == nameof(Security.IntradayMinuteBars))
                 {
                     Invoke(new Action(() =>
                     {
-                        ChartSeries.UpdateSeries();
+                        ChartSeries.RefreshSeries();
                         ChartArea.SetYRange(ChartSeries.MinYValue() * .98m, ChartSeries.MaxYValue() * 1.02m);
                     }));
                 }
@@ -2092,12 +2105,12 @@ namespace Finance
         {
             Points.Clear();
 
-            foreach (var tick in Security.IntradayTicks)
+            foreach (var minuteBar in Security.IntradayMinuteBars)
             {
                 var newPt = new DataPoint()
                 {
-                    XValue = tick.time.TotalMinutes,
-                    YValues = new[] { tick.lastTick.ToDouble() }
+                    XValue = minuteBar.BarDateTime.TimeOfDay.TotalMinutes,
+                    YValues = new[] { minuteBar.Close.ToDouble() }
                 };
                 Points.Add(newPt);
             }
@@ -2110,21 +2123,21 @@ namespace Finance
             }
         }
 
-        public void UpdateSeries()
+        public override void RefreshSeries()
         {
-            foreach (var tick in Security.IntradayTicks)
+            foreach (var minuteBar in Security.IntradayMinuteBars)
             {
-                var pt = Points.SingleOrDefault(x => x.XValue == tick.time.TotalMinutes);
+                var pt = Points.SingleOrDefault(x => x.XValue == minuteBar.BarDateTime.TimeOfDay.TotalMinutes);
 
-                if (pt != null && pt.YValues[0] == tick.lastTick.ToDouble())
+                if (pt != null && pt.YValues[0] == minuteBar.Close.ToDouble())
                     continue;
                 else if (pt != null)
                     Points.Remove(pt);
 
                 var newPt = new DataPoint()
                 {
-                    XValue = tick.time.TotalMinutes,
-                    YValues = new[] { tick.lastTick.ToDouble() }
+                    XValue = minuteBar.BarDateTime.TimeOfDay.TotalMinutes,
+                    YValues = new[] { minuteBar.Close.ToDouble() }
                 };
                 Points.Add(newPt);
             }
@@ -2187,7 +2200,12 @@ namespace Finance
                 SuspendItemChanged = true;
                 SuspendValueChanged = true;
             }
+
             base.SelectedIndex = this.Items.IndexOf((value as Enum).Description());
+
+            SuspendIndexChanged = false;
+            SuspendItemChanged = false;
+            SuspendValueChanged = false;
         }
         public TEnum GetSelectedValue()
         {

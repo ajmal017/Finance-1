@@ -314,7 +314,7 @@ namespace Finance.LiveTrading
         {
             get
             {
-                if (AverageCost == 0)
+                if (AverageCost == 0 || Size == 0)
                     return 0;
                 return (UnrlPNLDollars / Size / AverageCost) * Math.Sign(Size);
             }

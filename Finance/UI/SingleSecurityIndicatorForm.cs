@@ -64,7 +64,7 @@ namespace Finance
             {
                 if (ctrl is SingleStockIndicatorTile indicatorTile)
                     Invoke(new Action(() => indicatorTile.SetSecurity(this.Security)));
-            }            
+            }
         }
         public void SaveLayout()
         {

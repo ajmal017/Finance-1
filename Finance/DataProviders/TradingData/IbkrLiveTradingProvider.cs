@@ -165,7 +165,7 @@ namespace Finance.LiveTrading
                 Action = stopTrade.TradeDirection.Description(),
                 TotalQuantity = stopTrade.SubmittedQuantity.ToDouble(),
                 AuxPrice = stopTrade.LimitPrice.ToDouble(),
-                OrderType = trade.TradeType.Description(),
+                OrderType = stopTrade.TradeType.Description(),
                 Transmit = true
             };
 
@@ -174,7 +174,7 @@ namespace Finance.LiveTrading
             // Submit primary
             SubmittedTrades.Add((ibkrOrder.OrderId, trade, ibkrOrder));
             trade.TradeId = ibkrOrder.OrderId;
-            clientSocket.placeOrder(ordId, trade.Security.GetContract(), ibkrOrder);
+            clientSocket.placeOrder(ibkrOrder.OrderId, trade.Security.GetContract(), ibkrOrder);
 
             // Submit stoploss
             SubmittedTrades.Add((ordId, stopTrade, ibkrStopOrder));
@@ -375,6 +375,10 @@ namespace Finance.LiveTrading
             Console.WriteLine(GetCurrentMethod());
 
             var trade = GetTradeById(orderId);
+
+            // FIX THIS TO HANDLE OPEN ORDERS
+            if (trade == null)
+                return;
 
             Log(new LogMessage("ORDER STATUS", $"Order {orderId} ({trade}) STATUS: {status}  FILLED: {filled}/{remaining} at avg prx {avgFillPrice:$0.000}"));
 

@@ -129,7 +129,7 @@ namespace Finance.Data
                     RequestSnapshotQuotes(sec);
                 }
             };
-           // tmrSnapshot.Start();
+            // tmrSnapshot.Start();
         }
 
         #endregion
@@ -405,8 +405,9 @@ namespace Finance.Data
                 if (d.TimeOfDay == new TimeSpan(14, 59, 0))
                     Console.WriteLine();
 
-                TimeSpan dt = long.Parse(bar.Time).FromIbkrTimeFormat().TimeOfDay;
-                security.AddIntradayTick(dt, bar.Close.ToDecimal(), true);
+                DateTime dt = long.Parse(bar.Time).FromIbkrTimeFormat();
+
+                security.AddIntradayMinuteBar(dt, bar.Open.ToDecimal(), bar.High.ToDecimal(), bar.Low.ToDecimal(), bar.Close.ToDecimal(), bar.Volume, true);
             }
 
         }
@@ -421,7 +422,7 @@ namespace Finance.Data
                 if (security == null)
                     return;
 
-                security.IntradayTickInitialPopulateComplete();
+                security.IntradayMinuteInitialPopulateComplete();
             }
         }
         public void historicalDataUpdate(int reqId, Bar bar)
@@ -435,10 +436,8 @@ namespace Finance.Data
                     return;
 
                 var dt = long.Parse(bar.Time).FromIbkrTimeFormat();
-                security.AddIntradayTick(dt.TimeOfDay, bar.Close.ToDecimal(), false);
 
-                if(security.Ticker == "MSFT")
-                    Console.WriteLine();
+                security.AddIntradayMinuteBar(dt, bar.Open.ToDecimal(), bar.High.ToDecimal(), bar.Low.ToDecimal(), bar.Close.ToDecimal(), bar.Volume, true);
 
                 if (!ActiveQuotes.Exists(x => x.Security == security))
                 {

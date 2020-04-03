@@ -108,7 +108,6 @@ namespace Finance.LiveTrading
 
                 LiveQuoteForm.Instance.SetActiveSecurity(ActivePosition.Security);
                 LiveTradeEntryForm.Instance.SetActiveSecurity(ActivePosition.Security);
-                LiveTradeEntryForm.Instance.SetActiveAccount(ActiveAccount);
 
                 SingleSecurityIndicatorForm.Instance.SetSecurity(ActivePosition.Security);
             }

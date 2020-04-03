@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using Finance;
 using Finance.Data;
+using Finance.LiveTrading;
 using static Finance.Logger;
 using static Finance.Helpers;
 
@@ -62,6 +63,8 @@ namespace Finance
         private ToolStripMenuItem menuRequestMissingData;
         private ToolStripMenuItem menuReloadSecurityList;
         private ToolStripSeparator toolStripSeparator2;
+        private ToolStripMenuItem menuRepopulateAllIndices;
+        private ToolStripSeparator toolStripSeparator3;
         private ToolStripMenuItem menuRemoveDuplicates;
 
         private SecurityManagerForm()
@@ -107,6 +110,8 @@ namespace Finance
             this.securityFilterBox1 = new Finance.SecurityFilterBox();
             this.securityListGrid1 = new Finance.SecurityListGrid();
             this.securityInfoPanelNew1 = new Finance.SecurityInfoPanelNew();
+            this.menuRepopulateAllIndices = new System.Windows.Forms.ToolStripMenuItem();
+            this.toolStripSeparator3 = new System.Windows.Forms.ToolStripSeparator();
             this.menuStrip1.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -231,6 +236,8 @@ namespace Finance
             // 
             this.indicesToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.menuUpdateIndices,
+            this.menuRepopulateAllIndices,
+            this.toolStripSeparator3,
             this.menuTrendMonitor});
             this.indicesToolStripMenuItem.Name = "indicesToolStripMenuItem";
             this.indicesToolStripMenuItem.Size = new System.Drawing.Size(56, 20);
@@ -239,13 +246,13 @@ namespace Finance
             // menuUpdateIndices
             // 
             this.menuUpdateIndices.Name = "menuUpdateIndices";
-            this.menuUpdateIndices.Size = new System.Drawing.Size(152, 22);
+            this.menuUpdateIndices.Size = new System.Drawing.Size(180, 22);
             this.menuUpdateIndices.Text = "Update Indices";
             // 
             // menuTrendMonitor
             // 
             this.menuTrendMonitor.Name = "menuTrendMonitor";
-            this.menuTrendMonitor.Size = new System.Drawing.Size(152, 22);
+            this.menuTrendMonitor.Size = new System.Drawing.Size(180, 22);
             this.menuTrendMonitor.Text = "Trend Monitor";
             // 
             // securityFilterBox1
@@ -269,6 +276,17 @@ namespace Finance
             this.securityInfoPanelNew1.ShowControls = true;
             this.securityInfoPanelNew1.Size = new System.Drawing.Size(485, 380);
             this.securityInfoPanelNew1.TabIndex = 4;
+            // 
+            // repopulateIndicesToolStripMenuItem
+            // 
+            this.menuRepopulateAllIndices.Name = "repopulateIndicesToolStripMenuItem";
+            this.menuRepopulateAllIndices.Size = new System.Drawing.Size(180, 22);
+            this.menuRepopulateAllIndices.Text = "Repopulate Indices";
+            // 
+            // toolStripSeparator3
+            // 
+            this.toolStripSeparator3.Name = "toolStripSeparator3";
+            this.toolStripSeparator3.Size = new System.Drawing.Size(177, 6);
             // 
             // SecurityManagerForm
             // 
@@ -304,11 +322,14 @@ namespace Finance
                     }));
                 }
             };
+
             securityListGrid1.SelectedSecurityChanged += (s, e) =>
                 {
-                    securityInfoPanelNew1.LoadSecurity(this.SelectedSecurity);
+                    LiveDataProvider.Instance.RequestSnapshotQuotes(this.SelectedSecurity);
                     this.OnSelectedSecurityChanged();
+                    securityInfoPanelNew1.LoadSecurity(this.SelectedSecurity);
                 };
+
             securityFilterBox1.SelectedFiltersChanged += (s, e) =>
                     {
                         Invoke(new Action(() =>
@@ -440,6 +461,15 @@ namespace Finance
             {
                 if (RefDataManager.Instance.Status == ControlStatus.Ready)
                     RefDataManager.Instance.LoadSecurityList();
+            };
+
+            //
+            //
+            //
+            menuRepopulateAllIndices.Click += (s, e) =>
+            {
+                if (RefDataManager.Instance.Status == ControlStatus.Ready)
+                    IndexManager.Instance.RepopulateAllIndices();
             };
         }
 

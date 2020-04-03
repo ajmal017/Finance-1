@@ -239,6 +239,8 @@ namespace Finance
         public decimal Range => (High - Low);
         [NotMapped]
         public decimal PercentChange => (Close - Open) / Open;
+        [NotMapped]
+        public decimal AtrChange => (this.Change / this.AverageTrueRange());
 
         public PriceBar()
         {

@@ -111,6 +111,11 @@ namespace Finance.LiveTrading
             //
             positionsGrid.SelectionChanged += (s, e) =>
             {
+                //OnSelectedPositionChanged();
+            };
+
+            positionsGrid.CellDoubleClick += (s, e) =>
+            {
                 OnSelectedPositionChanged();
             };
 
@@ -152,16 +157,13 @@ namespace Finance.LiveTrading
         }
         private void UpdateDisplayTable()
         {
-            if (InvokeRequired)
+            Invoke(new Action(() =>
             {
-                Invoke(new Action(() => UpdateDisplayTable()));
-                return;
-            }
-
-            var bindSource = new BindingSource();
-            var positions = Account.Portfolio.Positions;
-            bindSource.DataSource = positions;
-            positionsGrid.DataSource = bindSource;
+                var bindSource = new BindingSource();
+                var positions = Account.Portfolio.Positions;
+                bindSource.DataSource = positions;
+                positionsGrid.DataSource = bindSource;
+            }));
         }
 
     }

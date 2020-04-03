@@ -470,4 +470,10 @@ namespace Finance
         RisingVolume = 1,
         FallingVolume = 2
     }
+
+    public enum ReturnFormat
+    {
+        Percent = 0,
+        ATR = 1
+    }
 }

@@ -477,7 +477,7 @@ namespace Finance
 
             if (PrimarySeries is FinanceAccountingSeries acctSer)
                 CurrentView = new FinanceChartView(acctSer.MinXValue, acctSer.MaxXValue);
-            else
+            else if (CurrentView == null)
                 CurrentView = FinanceChartView.Default();
 
             RedrawAxes();
@@ -511,11 +511,23 @@ namespace Finance
             var minAdj = RoundDownWholeNumberLargestPlace(minAct.ToDecimal()).ToDouble();
             var maxAdj = RoundUpWholeNumberLargestPlace(maxAct.ToDecimal()).ToDouble();
 
-            if ((maxAdj / maxAct) > 1.25)
+            if ((maxAdj / maxAct) > 1.40)
                 maxAdj = RoundUpWholeNumber2ndLargestPlace(maxAct.ToDecimal()).ToDouble();
+            else
+            {
+                while ((maxAdj / maxAct < 1.2))
+                    maxAdj += 0.25;
+            }
 
-            if ((minAdj / minAct) < .75)
+            if ((minAdj / minAct) < .60)
                 minAdj = RoundDownWholeNumber2ndLargestPlace(minAct.ToDecimal()).ToDouble();
+            else
+            {
+                while ((minAdj / minAct) > .80)
+                    minAdj -= 0.25;
+            }
+                
+
 
             PrimaryChartArea.AxisY.Maximum = maxAdj;
             PrimaryChartArea.AxisY.Minimum = minAdj;
@@ -984,9 +996,27 @@ namespace Finance
             LoadSwingPoints(swingpointBarCount);
             LoadSwingPointTrends(swingpointBarCount);
             LoadVolume();
+            ShowAtrBands();
 
             ReloadChart();
+
+            Security.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(Security.IntradayMinuteBars))
+                {
+                    Invoke(new Action(() =>
+                    {
+                        PrimarySeries.RefreshSeries();
+                        if (SecondarySeries.Name == "volume")
+                        {
+                            SecondarySeries.RefreshSeries();
+                        }
+                    }
+                    ));
+                };
+            };
         }
+
         private void LoadSwingPoints(int BarCount)
         {
             SwingPointSeries = new FinanceSwingPointSeries(Security, PriceBarSize, BarCount);
@@ -999,6 +1029,7 @@ namespace Finance
             TrendSeries.Name = "trends";
             this.Series.Add(TrendSeries);
         }
+
         public void LoadSignals(Simulation simulation)
         {
             List<Signal> signals = simulation.PortfolioManager.StrategyManager.GetSignalHistory(Security);
@@ -1012,7 +1043,6 @@ namespace Finance
             TradeSeries.Name = "trades";
             this.Series.Add(TradeSeries);
         }
-
         public void LoadVolume()
         {
             this.Series.Remove(SecondarySeries);
@@ -1032,6 +1062,73 @@ namespace Finance
             SecondaryChartArea.AxisYLabelFormat = "$0.00";
         }
 
+        public void ShowAtrBands()
+        {
+            if (PriceBarSize != PriceBarSize.Daily)
+                return;
+
+            PrimaryChartArea.AxisY.StripLines.Clear();
+
+            //
+            // Add a stripline for 1 ATR from current close
+            //
+            var atrValue = Security.GetLastBar(PriceBarSize).AverageTrueRange();
+            var lastClose = Security.IntradayBar?.Close ?? Security.GetLastBar(PriceBarSize).Close;
+
+            //
+            // Positive 1
+            //
+            PrimaryChartArea.AxisY.StripLines.Add(new StripLine()
+            {
+                Interval = 0,
+                IntervalOffset = (lastClose).ToDouble(),
+                StripWidth = atrValue.ToDouble(),
+                BackColor = Color.FromArgb(32, 0, 0, 255),
+                                BorderDashStyle = ChartDashStyle.Dot,
+                BorderColor = Color.FromArgb(255, 64, 64, 64),
+                BorderWidth = 1
+            });
+            //
+            // Positive 2
+            //
+            PrimaryChartArea.AxisY.StripLines.Add(new StripLine()
+            {
+                Interval = 0,
+                IntervalOffset = (lastClose + atrValue).ToDouble(),
+                StripWidth = atrValue.ToDouble(),
+                BackColor = Color.FromArgb(32, 0, 0, 128),
+                BorderDashStyle = ChartDashStyle.Dot,
+                BorderColor = Color.FromArgb(255,64,64,64),
+                BorderWidth = 1
+            });
+
+            //
+            // Negative 1
+            //
+            PrimaryChartArea.AxisY.StripLines.Add(new StripLine()
+            {
+                Interval = 0,
+                IntervalOffset = (lastClose - atrValue).ToDouble(),
+                StripWidth = atrValue.ToDouble(),
+                BackColor = Color.FromArgb(32, 255, 0, 0),
+                BorderDashStyle = ChartDashStyle.Dot,
+                BorderColor = Color.FromArgb(255, 64, 64, 64),
+                BorderWidth = 1
+            });
+            //
+            // Negative 2
+            //
+            PrimaryChartArea.AxisY.StripLines.Add(new StripLine()
+            {
+                Interval = 0,
+                IntervalOffset = (lastClose - (2 * atrValue)).ToDouble(),
+                StripWidth = atrValue.ToDouble(),
+                BackColor = Color.FromArgb(32, 128, 0, 0),
+                BorderDashStyle = ChartDashStyle.Dot,
+                BorderColor = Color.FromArgb(255, 64, 64, 64),
+                BorderWidth = 1
+            });
+        }
     }
     public class FinanceSimResultsChart : ChartBase
     {
@@ -1464,6 +1561,7 @@ namespace Finance
 
         protected abstract void SetStyles();
         protected abstract void BuildSeries();
+        public abstract void RefreshSeries();
     }
 
     public class FinanceSecuritySeries : FinanceSeries
@@ -1490,7 +1588,9 @@ namespace Finance
         {
             Points.Clear();
 
-
+            //
+            // Add historical data
+            //
             foreach (PriceBar bar in Security.GetPriceBars(PriceBarSize))
             {
                 var pt = new DataPoint(this)
@@ -1503,6 +1603,32 @@ namespace Finance
                 };
                 Points.Add(pt);
             }
+
+            //
+            // Add live intraday data
+            //
+
+            if (PriceBarSize != PriceBarSize.Daily)
+                return;
+
+            var intradayBar = Security.IntradayBar;
+            if (intradayBar != null)
+            {
+                var pt = new DataPoint(this)
+                {
+                    XValue = intradayBar.BarDateTime.Date.ToOADate(),
+                    YValues = intradayBar.AsChartingValue(),
+                    IsValueShownAsLabel = false,
+                    Tag = intradayBar,
+                    Color = (intradayBar.Change >= 0 ? Color.Green : Color.Red)
+                };
+                Points.Add(pt);
+            }
+        }
+
+        public override void RefreshSeries()
+        {
+            BuildSeries();
         }
     }
     public class FinanceVolumeSeries : FinanceSeries
@@ -1540,6 +1666,32 @@ namespace Finance
                 };
                 Points.Add(pt);
             }
+
+            //
+            // Add live intraday data
+            //
+
+            if (PriceBarSize != PriceBarSize.Daily)
+                return;
+
+            var intradayBar = Security.IntradayBar;
+            if (intradayBar != null)
+            {
+                var pt = new DataPoint(this)
+                {
+                    XValue = intradayBar.BarDateTime.Date.ToOADate(),
+                    YValues = new[] { Convert.ToDouble(intradayBar.Volume) },
+                    IsValueShownAsLabel = false,
+                    Tag = intradayBar,
+                    Color = Color.FromArgb(128, 255, 200, 0)
+                };
+                Points.Add(pt);
+            }
+        }
+
+        public override void RefreshSeries()
+        {
+            BuildSeries();
         }
     }
     public class FinanceSwingPointSeries : FinanceSeries
@@ -1648,6 +1800,11 @@ namespace Finance
                 }
             }
         }
+
+        public override void RefreshSeries()
+        {
+            throw new NotImplementedException();
+        }
     }
     public class FinanceTrendSeries : FinanceSeries
     {
@@ -1732,6 +1889,11 @@ namespace Finance
                 Points.Add(pt);
             }
         }
+
+        public override void RefreshSeries()
+        {
+            throw new NotImplementedException();
+        }
     }
 
     public class FinanceSignalSeries : FinanceSeries
@@ -1808,6 +1970,11 @@ namespace Finance
                 Points.Add(pt);
             }
         }
+
+        public override void RefreshSeries()
+        {
+            throw new NotImplementedException();
+        }
     }
     public class FinancePositionSeries : FinanceSeries
     {
@@ -1875,6 +2042,11 @@ namespace Finance
 
                 currentDate = currentDate.AddDays(1);
             }
+        }
+
+        public override void RefreshSeries()
+        {
+            throw new NotImplementedException();
         }
     }
     public class FinanceTradeSeries : FinanceSeries
@@ -1952,6 +2124,11 @@ namespace Finance
                 Points.Add(pt);
             }
         }
+
+        public override void RefreshSeries()
+        {
+            throw new NotImplementedException();
+        }
     }
 
     public class FinanceAccountingSeries : FinanceSeries
@@ -1988,6 +2165,11 @@ namespace Finance
                 Points.Add(pt);
                 currentDate = Calendar.NextTradingDay(currentDate);
             }
+        }
+
+        public override void RefreshSeries()
+        {
+            throw new NotImplementedException();
         }
     }
 

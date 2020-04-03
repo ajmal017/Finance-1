@@ -16,15 +16,7 @@ namespace TestFormProject
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            try
-            {
-                Application.Run(new Main());
-            }
-            catch (Exception ex)
-            {
-
-                throw;
-            }
+            Application.Run(new Main());
         }
     }
 }

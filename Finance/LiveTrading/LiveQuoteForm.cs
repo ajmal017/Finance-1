@@ -96,16 +96,7 @@ namespace Finance.LiveTrading
         [Initializer]
         private void InitializeHandlers()
         {
-            //
-            // Listen for SelectedSecurityChanged event from the SecMgr form
-            //
-            SecurityManagerForm.Instance.SelectedSecurityChanged += (s, e) =>
-            {
-                Invoke(new Action(() =>
-                {
-                    SetActiveSecurity(e.SelectedSecurity);
-                }));
-            };
+
         }
 
         public void SetActiveSecurity(Security security)

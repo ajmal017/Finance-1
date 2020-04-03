@@ -30,6 +30,7 @@
         {
             this.trendAveragePerformanceTile1 = new Finance.TrendAveragePerformanceTile();
             this.trendNormalizedPerformanceTile1 = new Finance.TrendNormalizedPerformanceTile();
+            this.singleStockPerformanceOutlookTile1 = new Finance.SingleStockPerformanceOutlookTile();
             this.SuspendLayout();
             // 
             // trendAveragePerformanceTile1
@@ -54,11 +55,23 @@
             this.trendNormalizedPerformanceTile1.Size = new System.Drawing.Size(500, 400);
             this.trendNormalizedPerformanceTile1.TabIndex = 0;
             // 
+            // singleStockPerformanceOutlookTile1
+            // 
+            this.singleStockPerformanceOutlookTile1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(48)))), ((int)(((byte)(48)))), ((int)(((byte)(48)))));
+            this.singleStockPerformanceOutlookTile1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.singleStockPerformanceOutlookTile1.Location = new System.Drawing.Point(1025, 13);
+            this.singleStockPerformanceOutlookTile1.MaximumSize = new System.Drawing.Size(500, 400);
+            this.singleStockPerformanceOutlookTile1.MinimumSize = new System.Drawing.Size(500, 400);
+            this.singleStockPerformanceOutlookTile1.Name = "singleStockPerformanceOutlookTile1";
+            this.singleStockPerformanceOutlookTile1.Size = new System.Drawing.Size(500, 400);
+            this.singleStockPerformanceOutlookTile1.TabIndex = 2;
+            // 
             // SingleSecurityIndicatorForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1031, 420);
+            this.ClientSize = new System.Drawing.Size(1532, 420);
+            this.Controls.Add(this.singleStockPerformanceOutlookTile1);
             this.Controls.Add(this.trendAveragePerformanceTile1);
             this.Controls.Add(this.trendNormalizedPerformanceTile1);
             this.Name = "SingleSecurityIndicatorForm";
@@ -71,5 +84,6 @@
 
         private TrendNormalizedPerformanceTile trendNormalizedPerformanceTile1;
         private TrendAveragePerformanceTile trendAveragePerformanceTile1;
+        private SingleStockPerformanceOutlookTile singleStockPerformanceOutlookTile1;
     }
 }

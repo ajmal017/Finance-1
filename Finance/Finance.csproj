@@ -93,10 +93,10 @@
     <Compile Include="Components\SingleStockIndicatorTile.cs">
       <SubType>Component</SubType>
     </Compile>
-    <Compile Include="Components\SingleSecurityIndicatorForm.cs">
+    <Compile Include="UI\SingleSecurityIndicatorForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="Components\SingleSecurityIndicatorForm.Designer.cs">
+    <Compile Include="UI\SingleSecurityIndicatorForm.Designer.cs">
       <DependentUpon>SingleSecurityIndicatorForm.cs</DependentUpon>
     </Compile>
     <Compile Include="DataProviders\LiveData\IbkrLiveDataProvider.cs" />
@@ -258,7 +258,7 @@
     <EmbeddedResource Include="Components\SecurityInfoPanelNew.resx">
       <DependentUpon>SecurityInfoPanelNew.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="Components\SingleSecurityIndicatorForm.resx">
+    <EmbeddedResource Include="UI\SingleSecurityIndicatorForm.resx">
       <DependentUpon>SingleSecurityIndicatorForm.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="LiveTrading\LiveAccountSummaryPanel.resx">

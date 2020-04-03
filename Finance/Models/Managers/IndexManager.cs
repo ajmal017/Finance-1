@@ -53,6 +53,13 @@ namespace Finance
                 UpdateSectorTrendIndices();
             }).Start();
         }
+        public void RepopulateAllIndices()
+        {
+            new Thread(() =>
+            {
+                PopulateSectorTrendIndices(Settings.Instance.Sector_Trend_Bar_Size);
+            }).Start();
+        }
 
         #region Sector Trend Indices
 
